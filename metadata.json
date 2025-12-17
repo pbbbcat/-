@@ -1,0 +1,5 @@
+{
+  "name": "Public Service Exam Smart Assistant",
+  "description": "A smart qualification matching and policy interpretation system for public service exam candidates, featuring AI-driven job matching and RAG-based policy Q&A.",
+  "requestFramePermissions": []
+}
