@@ -41,8 +41,10 @@ const MajorAnalysis: React.FC = () => {
           const counts: Record<string, number> = {};
           data.forEach(row => {
               if (!row.major_req) return;
-              const parts = row.major_req.split(/[,，、]/).map(s => s.trim());
-              parts.forEach(p => {
+              // 显式指定参数 s 为 string 类型
+              const parts = row.major_req.split(/[,，、]/).map((s: string) => s.trim());
+              // 显式指定参数 p 为 string 类型
+              parts.forEach((p: string) => {
                   if (p.length > 1 && !['不限', '无限制', '专业'].includes(p)) {
                       const key = p.replace(/[（(].*[)）]/, '').substring(0, 8); 
                       counts[key] = (counts[key] || 0) + 1;
@@ -95,21 +97,21 @@ const MajorAnalysis: React.FC = () => {
           <button onClick={() => setSelectedJob(null)} className="p-3 bg-white hover:bg-slate-100 rounded-full text-slate-400 transition-all border border-slate-100 shadow-sm"><X className="w-6 h-6" /></button>
         </div>
 
-        <div className="p-10 overflow-y-auto custom-scrollbar space-y-10 flex-1">
+        <div className="p-10 overflow-y-auto custom-scrollbar space-y-10 flex-1 text-left">
             <section>
                 <h4 className="text-sm font-bold text-slate-800 mb-5 flex items-center gap-2"><div className="w-1.5 h-4 bg-primary rounded-full"></div> 机构与职位概况</h4>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-                    <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
-                        <p className="text-[11px] text-slate-400 font-bold mb-1 uppercase tracking-wider">机构性质</p>
+                    <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100 text-left">
+                        <p className="text-[11px] text-slate-400 font-bold mb-1 uppercase tracking-wider text-left">机构性质</p>
                         <p className="text-base font-bold text-slate-700">{job.org_nature || '行政机关'}</p>
                     </div>
-                    <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
-                        <p className="text-[11px] text-slate-400 font-bold mb-1 uppercase tracking-wider">职位属性</p>
+                    <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100 text-left">
+                        <p className="text-[11px] text-slate-400 font-bold mb-1 uppercase tracking-wider text-left">职位属性</p>
                         <p className="text-base font-bold text-slate-700">{job.job_attr || '普通职位'}</p>
                     </div>
                     <div className="bg-emerald-50/50 p-5 rounded-3xl border border-emerald-100 flex items-center justify-between">
-                        <div>
-                            <p className="text-[11px] text-emerald-600/60 font-bold mb-1 uppercase tracking-wider">招考人数</p>
+                        <div className="text-left">
+                            <p className="text-[11px] text-emerald-600/60 font-bold mb-1 uppercase tracking-wider text-left">招考人数</p>
                             <p className="text-xl font-black text-emerald-600">共 {job.recruit_count || 1} 人</p>
                         </div>
                     </div>
@@ -117,27 +119,27 @@ const MajorAnalysis: React.FC = () => {
             </section>
 
             <section>
-                <h4 className="text-sm font-bold text-slate-800 mb-5 flex items-center gap-2"><div className="w-1.5 h-4 bg-emerald-500 rounded-full"></div> 报考硬性门槛</h4>
-                <div className="bg-slate-50/80 p-8 rounded-[2rem] border border-slate-100 space-y-6">
-                    <div className="grid grid-cols-2 gap-8">
-                        <div>
-                            <span className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mb-1 block">学历要求</span>
+                <h4 className="text-sm font-bold text-slate-800 mb-5 flex items-center gap-2 text-left"><div className="w-1.5 h-4 bg-emerald-500 rounded-full"></div> 报考硬性门槛</h4>
+                <div className="bg-slate-50/80 p-8 rounded-[2rem] border border-slate-100 space-y-6 text-left">
+                    <div className="grid grid-cols-2 gap-8 text-left">
+                        <div className="text-left">
+                            <span className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mb-1 block text-left">学历要求</span>
                             <p className="text-base font-bold text-slate-700">{job.degree_req}</p>
                         </div>
-                        <div>
-                            <span className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mb-1 block">学位要求</span>
+                        <div className="text-left">
+                            <span className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mb-1 block text-left">学位要求</span>
                             <p className="text-base font-bold text-slate-700">{job.degree_type || '学士及以上'}</p>
                         </div>
                     </div>
-                    <div className="pt-6 border-t border-slate-200">
-                        <span className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mb-3 block">专业要求原文</span>
-                        <p className="text-base font-bold text-primary leading-relaxed bg-white p-5 rounded-2xl border border-indigo-50 shadow-sm">{job.major_req}</p>
+                    <div className="pt-6 border-t border-slate-200 text-left">
+                        <span className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mb-3 block text-left">专业要求原文</span>
+                        <p className="text-base font-bold text-primary leading-relaxed bg-white p-5 rounded-2xl border border-indigo-50 shadow-sm text-left">{job.major_req}</p>
                     </div>
                 </div>
             </section>
 
             <section>
-                <h4 className="text-sm font-bold text-slate-800 mb-5 flex items-center gap-2"><div className="w-1.5 h-4 bg-amber-500 rounded-full"></div> 考试核心情报</h4>
+                <h4 className="text-sm font-bold text-slate-800 mb-5 flex items-center gap-2 text-left"><div className="w-1.5 h-4 bg-amber-500 rounded-full"></div> 考试核心情报</h4>
                 <div className="grid grid-cols-2 gap-6">
                     <div className="bg-amber-50/50 p-6 rounded-3xl border border-amber-100 flex justify-between items-center shadow-sm">
                         <span className="text-sm text-amber-700 font-bold">面试人员比例</span>
@@ -160,11 +162,11 @@ const MajorAnalysis: React.FC = () => {
             </div>
 
             {job.remarks && (
-              <div className="bg-red-50 p-6 rounded-3xl border border-red-100 shadow-sm">
-                <h5 className="text-red-600 font-bold text-xs mb-3 flex items-center gap-2 uppercase tracking-widest">
+              <div className="bg-red-50 p-6 rounded-3xl border border-red-100 shadow-sm text-left">
+                <h5 className="text-red-600 font-bold text-xs mb-3 flex items-center gap-2 uppercase tracking-widest text-left">
                   <AlertTriangle className="w-4 h-4" /> 重要备注
                 </h5>
-                <p className="text-sm text-red-500 leading-relaxed font-medium">{job.remarks}</p>
+                <p className="text-sm text-red-500 leading-relaxed font-medium text-left">{job.remarks}</p>
               </div>
             )}
         </div>
@@ -185,13 +187,13 @@ const MajorAnalysis: React.FC = () => {
   );
 
   return (
-    <div className="p-10 max-w-7xl mx-auto space-y-10 animate-soft pb-24">
+    <div className="p-10 max-w-7xl mx-auto space-y-10 animate-soft pb-24 text-left">
        <header>
-          <div className="flex items-center gap-3 mb-2">
+          <div className="flex items-center gap-3 mb-2 text-left">
              <PieIcon className="w-6 h-6 text-primary" />
-             <h1 className="text-3xl font-bold text-slate-800 tracking-tight">专业数据透视</h1>
+             <h1 className="text-3xl font-bold text-slate-800 tracking-tight text-left">专业数据透视</h1>
           </div>
-          <p className="text-slate-400 text-lg font-medium">基于 Supabase 知识库的全量数据分析，为您揭示专业的真实招考行情。</p>
+          <p className="text-slate-400 text-lg font-medium text-left">基于 Supabase 知识库的全量数据分析，为您揭示专业的真实招考行情。</p>
        </header>
 
        <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 flex gap-4 max-w-2xl mx-auto md:mx-0">
@@ -205,52 +207,52 @@ const MajorAnalysis: React.FC = () => {
        {loading ? (
           <div className="py-40 flex flex-col items-center justify-center"><Loader2 className="animate-spin text-primary opacity-20 w-12 h-12" /></div>
        ) : view === 'overview' ? (
-          <div className="space-y-12 animate-soft">
-             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <div className="bg-primary p-8 rounded-[2.5rem] text-white shadow-xl shadow-indigo-100">
+          <div className="space-y-12 animate-soft text-left">
+             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-left">
+                <div className="bg-primary p-8 rounded-[2.5rem] text-white shadow-xl shadow-indigo-100 text-left">
                    <Database className="w-8 h-8 opacity-60 mb-6" />
                    <p className="text-sm font-bold opacity-80 mb-2">知识库岗位样本</p>
                    <p className="text-4xl font-black">1,000+</p>
                    <p className="text-[10px] font-bold opacity-40 mt-4 uppercase tracking-widest">Based on latest real data</p>
                 </div>
-                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col justify-center">
+                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col justify-center text-left">
                    <p className="text-slate-400 font-bold flex items-center gap-2 mb-2"><TrendingUp className="w-4 h-4 text-emerald-400" /> 热门专业 Top 1</p>
                    <p className="text-3xl font-black text-slate-800">财务管理</p>
                 </div>
-                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col justify-center">
+                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col justify-center text-left">
                    <p className="text-slate-400 font-bold flex items-center gap-2 mb-2"><Target className="w-4 h-4 text-amber-400" /> 覆盖专业领域</p>
                    <p className="text-3xl font-black text-slate-800">50+ 类</p>
                 </div>
              </div>
-             <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm">
-                <h2 className="text-xl font-bold text-slate-800 mb-10 flex items-center gap-3"><TrendingUp className="w-6 h-6 text-primary" /> 热门招考专业排行榜 (Top 10)</h2>
+             <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm text-left">
+                <h2 className="text-xl font-bold text-slate-800 mb-10 flex items-center gap-3 text-left"><TrendingUp className="w-6 h-6 text-primary" /> 热门招考专业排行榜 (Top 10)</h2>
                 <div className="w-full h-[400px]">
                     <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={trends}>
                             <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fontWeight: 700, fill: '#94A3B8'}} />
                             <YAxis hide />
                             <Tooltip cursor={{fill: '#F8FAFC'}} contentStyle={{borderRadius: '24px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}} />
-                            <Bar dataKey="count" fill="#3B82F6" radius={[12, 12, 12, 12]} barSize={40} className="cursor-pointer" onClick={(d) => analyzeMajor(d.name)} />
+                            <Bar dataKey="count" fill="#3B82F6" radius={[12, 12, 12, 12]} barSize={40} className="cursor-pointer" onClick={(d: any) => d && d.name && analyzeMajor(d.name)} />
                         </BarChart>
                     </ResponsiveContainer>
                 </div>
              </div>
           </div>
        ) : detailData && (
-          <div className="space-y-10 animate-soft">
+          <div className="space-y-10 animate-soft text-left">
              <button onClick={() => setView('overview')} className="text-slate-400 font-bold flex items-center gap-2 hover:text-primary transition-colors">
                 <ArrowLeft className="w-4 h-4" /> 返回热门排行
              </button>
-             <div className="flex flex-col md:flex-row justify-between items-end gap-6">
-                <div>
-                   <h2 className="text-4xl font-bold text-slate-800">{detailData.majorName}</h2>
-                   <p className="text-slate-400 mt-2 font-medium flex items-center gap-2"><Database className="w-4 h-4" /> 在当前样本中检索到 {detailData.totalJobs}+ 个相关岗位</p>
+             <div className="flex flex-col md:flex-row justify-between items-end gap-6 text-left">
+                <div className="text-left">
+                   <h2 className="text-4xl font-bold text-slate-800 text-left">{detailData.majorName}</h2>
+                   <p className="text-slate-400 mt-2 font-medium flex items-center gap-2 text-left"><Database className="w-4 h-4" /> 在当前样本中检索到 {detailData.totalJobs}+ 个相关岗位</p>
                 </div>
              </div>
 
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100">
-                   <h3 className="text-sm font-bold text-slate-800 mb-8 flex items-center gap-2 text-emerald-600"><ClipboardList className="w-4 h-4" /> 学历门槛分析</h3>
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-left">
+                <div className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100 text-left">
+                   <h3 className="text-sm font-bold text-slate-800 mb-8 flex items-center gap-2 text-emerald-600 text-left"><ClipboardList className="w-4 h-4" /> 学历门槛分析</h3>
                    <div className="h-[250px]">
                       <ResponsiveContainer width="100%" height="100%">
                          <PieChart>
@@ -262,8 +264,8 @@ const MajorAnalysis: React.FC = () => {
                       </ResponsiveContainer>
                    </div>
                 </div>
-                <div className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100">
-                   <h3 className="text-sm font-bold text-slate-800 mb-8 flex items-center gap-2 text-red-600"><Users className="w-4 h-4" /> 政治面貌要求</h3>
+                <div className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100 text-left">
+                   <h3 className="text-sm font-bold text-slate-800 mb-8 flex items-center gap-2 text-red-600 text-left"><Users className="w-4 h-4" /> 政治面貌要求</h3>
                    <div className="h-[250px]">
                       <ResponsiveContainer width="100%" height="100%">
                          <PieChart>
@@ -277,13 +279,13 @@ const MajorAnalysis: React.FC = () => {
                 </div>
              </div>
 
-             <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-                <div className="lg:col-span-2 bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100">
-                   <h3 className="text-sm font-bold text-slate-800 mb-6 flex items-center justify-between">
-                      <span className="flex items-center gap-2 text-blue-600"><Building2 className="w-4 h-4" /> 招录大户 (Top 5)</span>
+             <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 text-left">
+                <div className="lg:col-span-2 bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100 text-left">
+                   <h3 className="text-sm font-bold text-slate-800 mb-6 flex items-center justify-between text-left">
+                      <span className="flex items-center gap-2 text-blue-600 text-left"><Building2 className="w-4 h-4" /> 招录大户 (Top 5)</span>
                       {filterDept && <button onClick={() => setFilterDept(null)} className="text-[10px] text-primary hover:underline">清除筛选</button>}
                    </h3>
-                   <p className="text-[10px] text-slate-400 mb-4 font-bold">点击部门名称筛选右侧岗位</p>
+                   <p className="text-[10px] text-slate-400 mb-4 font-bold text-left">点击部门名称筛选右侧岗位</p>
                    <div className="space-y-3">
                       {detailData.topDepts.map((dept, i) => (
                          <div key={i} onClick={() => setFilterDept(dept.name)} className={`p-4 rounded-2xl border transition-all cursor-pointer flex justify-between items-center ${filterDept === dept.name ? 'bg-primary text-white border-primary shadow-lg' : 'bg-slate-50 border-slate-50 hover:bg-white hover:border-slate-100'}`}>
@@ -293,19 +295,19 @@ const MajorAnalysis: React.FC = () => {
                       ))}
                    </div>
                 </div>
-                <div className="lg:col-span-3 bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100">
-                   <h3 className="text-sm font-bold text-slate-800 mb-6 flex items-center gap-2"><Database className="w-4 h-4 text-primary" /> 真实岗位示例</h3>
+                <div className="lg:col-span-3 bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100 text-left">
+                   <h3 className="text-sm font-bold text-slate-800 mb-6 flex items-center gap-2 text-left"><Database className="w-4 h-4 text-primary" /> 真实岗位示例</h3>
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-[500px] overflow-y-auto custom-scrollbar pr-2">
                       {filteredSamples.length > 0 ? filteredSamples.map((job, i) => (
-                         <div key={i} onClick={() => setSelectedJob(job)} className="p-5 bg-slate-50/50 rounded-[2rem] border border-transparent hover:border-slate-100 hover:bg-white hover:shadow-lg transition-all cursor-pointer group flex flex-col justify-between">
-                            <div>
-                               <h4 className="font-bold text-slate-800 text-sm mb-1 truncate group-hover:text-primary transition-colors">{job.job_name}</h4>
-                               <p className="text-[10px] text-slate-400 flex items-center gap-1 font-bold mb-3"><Building2 className="w-3 h-3" /> {job.dept_name}</p>
-                               <div className="space-y-1">
-                                  <p className="text-[10px] text-slate-400 font-medium line-clamp-2">专业要求: {job.major_req}</p>
+                         <div key={i} onClick={() => setSelectedJob(job)} className="p-5 bg-slate-50/50 rounded-[2rem] border border-transparent hover:border-slate-100 hover:bg-white hover:shadow-lg transition-all cursor-pointer group flex flex-col justify-between text-left">
+                            <div className="text-left">
+                               <h4 className="font-bold text-slate-800 text-sm mb-1 truncate group-hover:text-primary transition-colors text-left">{job.job_name}</h4>
+                               <p className="text-[10px] text-slate-400 flex items-center gap-1 font-bold mb-3 text-left"><Building2 className="w-3 h-3" /> {job.dept_name}</p>
+                               <div className="space-y-1 text-left">
+                                  <p className="text-[10px] text-slate-400 font-medium line-clamp-2 text-left">专业要求: {job.major_req}</p>
                                </div>
                             </div>
-                            <div className="mt-4 pt-3 border-t border-slate-50 flex justify-between items-center">
+                            <div className="mt-4 pt-3 border-t border-slate-50 flex justify-between items-center text-left">
                                <span className="text-[9px] bg-white px-2 py-0.5 rounded-lg border border-slate-100 text-slate-500 font-bold">{job.degree_req}</span>
                                <ChevronRight className="w-3 h-3 text-slate-200 group-hover:text-primary transition-all" />
                             </div>
