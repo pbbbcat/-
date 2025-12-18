@@ -62,6 +62,25 @@ const JobMatching: React.FC<JobMatchingProps> = ({ userProfile, onProfileChange 
       }
   };
 
+  // 智能跳转逻辑：处理不规范的 URL，提供官方兜底
+  const handleApplyUrl = (url?: string) => {
+    // 官方统一报名入口兜底
+    const FALLBACK_URL = 'http://bm.scs.gov.cn/pp/gkweb/core/web/ui/business/home/gkhome.html';
+    
+    if (!url || url.trim() === '#' || url.trim().length < 5) {
+      window.open(FALLBACK_URL, '_blank');
+      return;
+    }
+
+    let targetUrl = url.trim();
+    // 补全协议头，防止被识别为相对路径导致 404
+    if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+      targetUrl = 'https://' + targetUrl;
+    }
+    
+    window.open(targetUrl, '_blank');
+  };
+
   const renderJobDetailModal = () => {
     if (!selectedJob) return null;
     const job = selectedJob;
@@ -163,7 +182,7 @@ const JobMatching: React.FC<JobMatchingProps> = ({ userProfile, onProfileChange 
               </button>
               <button 
                 className="px-10 py-4 bg-primary text-white font-bold rounded-2xl shadow-xl shadow-indigo-100 hover:bg-indigo-600 transition-all flex items-center gap-3 active:scale-95"
-                onClick={() => window.open(job.website || 'https://www.scs.gov.cn/', '_blank')}
+                onClick={() => handleApplyUrl(job.website)}
               >
                 立即去报名 <ExternalLink className="w-5 h-5" />
               </button>
@@ -178,16 +197,41 @@ const JobMatching: React.FC<JobMatchingProps> = ({ userProfile, onProfileChange 
       <div className="p-10 max-w-7xl mx-auto space-y-12 animate-soft pb-24">
           <header>
               <h1 className="text-4xl font-bold text-slate-800 tracking-tight text-left">智能岗位资格匹配</h1>
-              <p className="text-slate-400 mt-3 text-lg font-medium leading-relaxed text-left">请确认您的画像，AI 专家将从 Supabase 库中为您进行深度比对并推荐相似岗位。</p>
+              <p className="text-slate-400 mt-3 text-lg font-medium leading-relaxed text-left">请确认您的报考画像，AI 专家将从知识库中为您进行“硬性门槛+软性备注”的深度比对。</p>
           </header>
 
           {step === 1 && (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 items-start">
                   <div className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100 space-y-8 sticky top-10">
                       <h2 className="text-xl font-bold text-slate-800 flex items-center gap-3">
-                        <Edit3 className="w-6 h-6 text-primary" /> 您的报考画像
+                        <Edit3 className="w-6 h-6 text-primary" /> 完善报考画像
                       </h2>
                       <div className="space-y-6">
+                          {/* Grid for compact fields */}
+                          <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2 text-left">
+                                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 block text-left">性别</label>
+                                  <select 
+                                    className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold outline-none appearance-none" 
+                                    value={userProfile.gender} 
+                                    onChange={e => onProfileChange({...userProfile, gender: e.target.value})}
+                                  >
+                                    <option>男</option><option>女</option>
+                                  </select>
+                              </div>
+                              <div className="space-y-2 text-left">
+                                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 block text-left">身份</label>
+                                  <select 
+                                    className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold outline-none appearance-none" 
+                                    value={userProfile.isFreshGrad ? '应届' : '往届'} 
+                                    onChange={e => onProfileChange({...userProfile, isFreshGrad: e.target.value === '应届'})}
+                                  >
+                                    <option value="应届">应届毕业生</option>
+                                    <option value="往届">社会人员/往届</option>
+                                  </select>
+                              </div>
+                          </div>
+
                           <div className="space-y-2 text-left">
                               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 block text-left">最高学历</label>
                               <select 
@@ -198,16 +242,18 @@ const JobMatching: React.FC<JobMatchingProps> = ({ userProfile, onProfileChange 
                                 <option>大专</option><option>本科</option><option>硕士研究生</option><option>博士研究生</option>
                               </select>
                           </div>
+
                           <div className="space-y-2 text-left">
-                              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 block text-left">具体专业</label>
+                              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 block text-left">具体专业 (关键)</label>
                               <input 
                                 type="text" 
-                                className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold outline-none" 
+                                className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold outline-none focus:ring-2 focus:ring-primary/10 transition-all" 
                                 value={userProfile.major} 
                                 onChange={e => onProfileChange({...userProfile, major: e.target.value})} 
-                                placeholder="例如：计算机科学与技术" 
+                                placeholder="例如：法学、计算机科学与技术" 
                               />
                           </div>
+
                           <div className="space-y-2 text-left">
                               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 block text-left">政治面貌</label>
                               <select 
@@ -218,26 +264,29 @@ const JobMatching: React.FC<JobMatchingProps> = ({ userProfile, onProfileChange 
                                 <option>群众</option><option>共青团员</option><option>预备党员</option><option>中共党员</option>
                               </select>
                           </div>
-                          <button 
-                            onClick={handleProfileSearch} 
-                            className="w-full py-4 bg-emerald-50 text-emerald-600 font-bold rounded-2xl hover:bg-emerald-100 transition-all text-sm flex items-center justify-center gap-2 border border-emerald-100"
-                          >
-                             <Search className="w-4 h-4" /> 一键检索适配岗位
-                          </button>
+
+                          <div className="pt-4 border-t border-slate-50">
+                             <button 
+                                onClick={handleProfileSearch} 
+                                className="w-full py-4 bg-emerald-50 text-emerald-600 font-bold rounded-2xl hover:bg-emerald-100 transition-all text-sm flex items-center justify-center gap-2 border border-emerald-100 active:scale-95"
+                             >
+                                <Search className="w-4 h-4" /> 一键检索适配岗位
+                             </button>
+                          </div>
                       </div>
                   </div>
 
                   <div className="lg:col-span-2 space-y-8">
                       <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
                           <div className="flex bg-slate-50/50 p-2 border-b border-slate-100">
-                             <button onClick={() => setActiveTab('text')} className={`flex-1 py-4 text-sm font-bold rounded-2xl transition-all ${activeTab === 'text' ? 'bg-white text-primary shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>粘贴文本</button>
-                             <button onClick={() => setActiveTab('file')} className={`flex-1 py-4 text-sm font-bold rounded-2xl transition-all ${activeTab === 'file' ? 'bg-white text-primary shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>上传图片识别</button>
+                             <button onClick={() => setActiveTab('text')} className={`flex-1 py-4 text-sm font-bold rounded-2xl transition-all ${activeTab === 'text' ? 'bg-white text-primary shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>岗位匹配模式 (粘贴公告文本)</button>
+                             <button onClick={() => setActiveTab('file')} className={`flex-1 py-4 text-sm font-bold rounded-2xl transition-all ${activeTab === 'file' ? 'bg-white text-primary shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>上传图片识别 (OCR)</button>
                           </div>
-                          <div className="p-10 h-[380px]">
+                          <div className="p-10 h-[420px]">
                               {activeTab === 'text' ? (
                                 <textarea 
                                   className="w-full h-full p-8 bg-slate-50/50 border border-slate-100 rounded-[2rem] focus:bg-white focus:ring-4 focus:ring-primary/5 resize-none font-medium text-sm leading-relaxed outline-none transition-all" 
-                                  placeholder="在此粘贴职位表中的岗位要求，AI 专家将为您进行深度比对..." 
+                                  placeholder="您可以粘贴职位表中的一行，或者某个岗位的具体要求文本。AI 将帮您分析该岗位是否适合您（包含对备注栏中性别、应届生、四六级要求的语义分析）。" 
                                   value={jobText} 
                                   onChange={(e) => setJobText(e.target.value)} 
                                 />
@@ -253,7 +302,7 @@ const JobMatching: React.FC<JobMatchingProps> = ({ userProfile, onProfileChange 
                               onClick={handleAnalysis} 
                               className="w-full py-5 bg-primary text-white rounded-[2rem] shadow-2xl shadow-indigo-200 hover:bg-indigo-600 active:scale-[0.98] transition-all font-bold text-lg flex items-center justify-center gap-3"
                             >
-                              <Sparkles className="w-6 h-6" /> 开始精准资格比对
+                              <Sparkles className="w-6 h-6" /> 开始深度匹配
                             </button>
                           </div>
                       </div>

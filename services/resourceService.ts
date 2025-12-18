@@ -164,17 +164,6 @@ export const fetchPolicyArticles = async (): Promise<ResourceItem[]> => {
 
     return [
         { 
-            id: 'p-2026-gk-analysis', 
-            title: '2026年度国考大数据：过审人数首破340万，平均竞争比分析', 
-            source: '国家公务员局', 
-            type: 'policy', 
-            category: '公告',
-            publishDate: '2025-12-05', 
-            summary: '2026年度国考报名数据统计出炉。本篇通过深度建模分析各系统（税务、海关、海事）的进面预测线与调剂空间。',
-            tags: ['国考', '竞争比'], 
-            url: 'http://bm.scs.gov.cn/' 
-        },
-        { 
             id: 'p-2026-sk-changes', 
             title: '2026年省考联考前瞻：多省份扩招趋势与笔试命题新变化', 
             source: '人民网', 

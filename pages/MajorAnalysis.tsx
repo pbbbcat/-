@@ -21,6 +21,38 @@ interface MajorDeepDive {
 
 const SOFT_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
 
+// 自定义 X 轴标签组件，用于长文本换行显示
+const CustomXAxisTick = (props: any) => {
+  const { x, y, payload } = props;
+  const value = payload.value;
+  const maxLength = 5; // 每行最大字符数
+  
+  // 将长文本切分为多行
+  const lines = [];
+  for (let i = 0; i < value.length; i += maxLength) {
+    lines.push(value.substring(i, i + maxLength));
+  }
+
+  return (
+    <g transform={`translate(${x},${y})`}>
+      {lines.map((line, index) => (
+        <text
+          key={index}
+          x={0}
+          y={0}
+          dy={15 + index * 14} // 行高控制
+          textAnchor="middle"
+          fill="#94A3B8"
+          fontSize={11}
+          fontWeight={700}
+        >
+          {line}
+        </text>
+      ))}
+    </g>
+  );
+};
+
 const MajorAnalysis: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
@@ -36,17 +68,20 @@ const MajorAnalysis: React.FC = () => {
   const fetchMarketTrends = async () => {
       setLoading(true);
       try {
-          const { data } = await supabase.from('public_service_jobs').select('major_req').not('major_req', 'is', null).limit(3000); 
+          const { data } = await supabase
+            .from('public_service_jobs')
+            .select('major_req')
+            .not('major_req', 'is', null)
+            .range(0, 9999); 
+            
           if (!data) return;
           const counts: Record<string, number> = {};
           data.forEach(row => {
               if (!row.major_req) return;
-              // 修复 TS7006: 显式指定参数 s 为 string 类型
               const parts = row.major_req.split(/[,，、]/).map((s: string) => s.trim());
-              // 修复 TS7006: 显式指定参数 p 为 string 类型
               parts.forEach((p: string) => {
                   if (p.length > 1 && !['不限', '无限制', '专业'].includes(p)) {
-                      const key = p.replace(/[（(].*[)）]/, '').substring(0, 8); 
+                      const key = p.replace(/[（(].*[)）]/, '').trim(); 
                       counts[key] = (counts[key] || 0) + 1;
                   }
               });
@@ -79,11 +114,24 @@ const MajorAnalysis: React.FC = () => {
       } finally { setAnalyzing(false); }
   };
 
+  const handleApplyUrl = (url?: string) => {
+    const FALLBACK_URL = 'http://bm.scs.gov.cn/pp/gkweb/core/web/ui/business/home/gkhome.html';
+    if (!url || url.trim() === '#' || url.trim().length < 5) {
+      window.open(FALLBACK_URL, '_blank');
+      return;
+    }
+    let targetUrl = url.trim();
+    if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+      targetUrl = 'https://' + targetUrl;
+    }
+    window.open(targetUrl, '_blank');
+  };
+
   const filteredSamples = detailData?.sampleJobs.filter(j => !filterDept || j.dept_name === filterDept) || [];
 
   const renderJobDetailModal = (job: PublicServiceJobDB) => (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md animate-fade-in">
-      <div className="bg-white rounded-[2.5rem] w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] animate-soft border border-white/20">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md animate-fade-in">
+      <div className="bg-white rounded-[2.5rem] w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] border border-white/20">
         <div className="px-10 py-8 border-b border-slate-50 flex justify-between items-start bg-slate-50/50">
           <div>
             <div className="flex items-center gap-2 mb-2">
@@ -177,7 +225,7 @@ const MajorAnalysis: React.FC = () => {
             </div>
             <button 
               className="px-10 py-4 bg-primary text-white font-bold rounded-2xl shadow-xl shadow-indigo-100 hover:bg-indigo-600 transition-all flex items-center gap-3 active:scale-95"
-              onClick={() => window.open(job.website || 'https://www.scs.gov.cn/', '_blank')}
+              onClick={() => handleApplyUrl(job.website)}
             >
               去报名 <ExternalLink className="w-5 h-5" />
             </button>
@@ -187,145 +235,207 @@ const MajorAnalysis: React.FC = () => {
   );
 
   return (
-    <div className="p-10 max-w-7xl mx-auto space-y-10 animate-soft pb-24 text-left">
-       <header>
-          <div className="flex items-center gap-3 mb-2 text-left">
-             <PieIcon className="w-6 h-6 text-primary" />
-             <h1 className="text-3xl font-bold text-slate-800 tracking-tight text-left">专业数据透视</h1>
-          </div>
-          <p className="text-slate-400 text-lg font-medium text-left">基于 Supabase 知识库的全量数据分析，为您揭示专业的真实招考行情。</p>
-       </header>
+    <>
+        <div className="p-8 max-w-7xl mx-auto animate-soft pb-24 relative">
+            <header className="mb-10">
+                <div className="flex justify-between items-end mb-6">
+                    <div>
+                        <h1 className="text-4xl font-bold text-slate-800 tracking-tight">专业就业透视</h1>
+                        <p className="text-slate-400 mt-2 text-lg font-medium">基于 2026 年度真实岗位数据的大数据画像。</p>
+                    </div>
+                    {view === 'detail' && (
+                        <button onClick={() => setView('overview')} className="px-6 py-2 bg-white text-slate-500 border border-slate-200 rounded-xl hover:bg-slate-50 font-bold text-sm flex items-center gap-2">
+                            <ArrowLeft className="w-4 h-4" /> 返回全景概览
+                        </button>
+                    )}
+                </div>
 
-       <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 flex gap-4 max-w-2xl mx-auto md:mx-0">
-          <div className="relative flex-1">
-             <Search className="absolute left-4 top-4 text-slate-300 w-5 h-5" />
-             <input type="text" placeholder="输入任意专业（如：法学、统计学），查看深度分析..." className="w-full pl-12 pr-4 py-4 bg-slate-50 border-none rounded-[1.5rem] focus:ring-4 focus:ring-primary/5 outline-none font-bold text-slate-700" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && analyzeMajor(searchTerm)} />
-          </div>
-          <button onClick={() => analyzeMajor(searchTerm)} disabled={analyzing} className="px-8 py-4 bg-primary text-white font-bold rounded-[1.5rem] shadow-lg shadow-indigo-100 transition-all">深度分析</button>
-       </div>
+                <div className="relative max-w-2xl">
+                    <Search className="absolute left-4 top-4 w-5 h-5 text-slate-300" />
+                    <input 
+                        type="text" 
+                        placeholder="输入您的专业名称，例如：法学、汉语言文学..." 
+                        className="w-full pl-12 pr-4 py-4 bg-white border border-slate-100 rounded-2xl focus:ring-4 focus:ring-primary/5 outline-none transition-all shadow-sm font-bold text-slate-700"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && analyzeMajor(searchTerm)}
+                    />
+                    <button 
+                        onClick={() => analyzeMajor(searchTerm)}
+                        className="absolute right-2 top-2 px-6 py-2 bg-primary text-white font-bold rounded-xl shadow-lg shadow-indigo-100 hover:bg-indigo-600 transition-all active:scale-95"
+                    >
+                        深度分析
+                    </button>
+                </div>
+            </header>
 
-       {loading ? (
-          <div className="py-40 flex flex-col items-center justify-center"><Loader2 className="animate-spin text-primary opacity-20 w-12 h-12" /></div>
-       ) : view === 'overview' ? (
-          <div className="space-y-12 animate-soft text-left">
-             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-left">
-                <div className="bg-primary p-8 rounded-[2.5rem] text-white shadow-xl shadow-indigo-100 text-left">
-                   <Database className="w-8 h-8 opacity-60 mb-6" />
-                   <p className="text-sm font-bold opacity-80 mb-2">知识库岗位样本</p>
-                   <p className="text-4xl font-black">1,000+</p>
-                   <p className="text-[10px] font-bold opacity-40 mt-4 uppercase tracking-widest">Based on latest real data</p>
+            {loading || analyzing ? (
+                <div className="py-40 flex flex-col items-center justify-center">
+                    <Loader2 className="w-12 h-12 text-primary animate-spin opacity-20 mb-4" />
+                    <p className="text-slate-400 font-bold">{analyzing ? '正在生成专业画像...' : '正在加载全网数据...'}</p>
                 </div>
-                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col justify-center text-left">
-                   <p className="text-slate-400 font-bold flex items-center gap-2 mb-2"><TrendingUp className="w-4 h-4 text-emerald-400" /> 热门专业 Top 1</p>
-                   <p className="text-3xl font-black text-slate-800">财务管理</p>
-                </div>
-                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col justify-center text-left">
-                   <p className="text-slate-400 font-bold flex items-center gap-2 mb-2"><Target className="w-4 h-4 text-amber-400" /> 覆盖专业领域</p>
-                   <p className="text-3xl font-black text-slate-800">50+ 类</p>
-                </div>
-             </div>
-             <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm text-left">
-                <h2 className="text-xl font-bold text-slate-800 mb-10 flex items-center gap-3 text-left"><TrendingUp className="w-6 h-6 text-primary" /> 热门招考专业排行榜 (Top 10)</h2>
-                <div className="w-full h-[400px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={trends}>
-                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fontWeight: 700, fill: '#94A3B8'}} />
-                            <YAxis hide />
-                            <Tooltip cursor={{fill: '#F8FAFC'}} contentStyle={{borderRadius: '24px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}} />
-                            {/* 修复 TS2345: 将 d.name 强制转换为 string 传给 analyzeMajor */}
-                            <Bar dataKey="count" fill="#3B82F6" radius={[12, 12, 12, 12]} barSize={40} className="cursor-pointer" onClick={(d: any) => d && d.name && analyzeMajor(d.name as string)} />
-                        </BarChart>
-                    </ResponsiveContainer>
-                </div>
-             </div>
-          </div>
-       ) : detailData && (
-          <div className="space-y-10 animate-soft text-left">
-             <button onClick={() => setView('overview')} className="text-slate-400 font-bold flex items-center gap-2 hover:text-primary transition-colors">
-                <ArrowLeft className="w-4 h-4" /> 返回热门排行
-             </button>
-             <div className="flex flex-col md:flex-row justify-between items-end gap-6 text-left">
-                <div className="text-left">
-                   <h2 className="text-4xl font-bold text-slate-800 text-left">{detailData.majorName}</h2>
-                   <p className="text-slate-400 mt-2 font-medium flex items-center gap-2 text-left"><Database className="w-4 h-4" /> 在当前样本中检索到 {detailData.totalJobs}+ 个相关岗位</p>
-                </div>
-             </div>
+            ) : view === 'overview' ? (
+                <div className="space-y-10 animate-fade-in">
+                    <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                        <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                            <TrendingUp className="w-5 h-5 text-emerald-500" />
+                            2026 年度热门报考专业 TOP 10
+                        </h3>
+                        <div className="h-[400px] w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={trends} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                                    <XAxis dataKey="name" tick={<CustomXAxisTick />} interval={0} height={60} axisLine={false} tickLine={false} />
+                                    <Tooltip 
+                                        cursor={{ fill: '#F1F5F9', radius: 8 }} 
+                                        contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}
+                                    />
+                                    <Bar 
+                                        dataKey="count" 
+                                        fill="#6366f1" 
+                                        radius={[8, 8, 0, 0]} 
+                                        barSize={40} 
+                                        onClick={(data) => data && analyzeMajor(data.name)}
+                                        cursor="pointer"
+                                    />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
 
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-left">
-                <div className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100 text-left">
-                   <h3 className="text-sm font-bold text-slate-800 mb-8 flex items-center gap-2 text-emerald-600 text-left"><ClipboardList className="w-4 h-4" /> 学历门槛分析</h3>
-                   <div className="h-[250px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                         <PieChart>
-                            <Pie data={detailData.degreeStats} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
-                               {detailData.degreeStats.map((_, i) => <Cell key={i} fill={SOFT_COLORS[i % SOFT_COLORS.length]} />)}
-                            </Pie>
-                            <Tooltip />
-                         </PieChart>
-                      </ResponsiveContainer>
-                   </div>
-                </div>
-                <div className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100 text-left">
-                   <h3 className="text-sm font-bold text-slate-800 mb-8 flex items-center gap-2 text-red-600 text-left"><Users className="w-4 h-4" /> 政治面貌要求</h3>
-                   <div className="h-[250px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                         <PieChart>
-                            <Pie data={detailData.politicStats} outerRadius={90} dataKey="value">
-                               {detailData.politicStats.map((_, i) => <Cell key={i} fill={SOFT_COLORS[(i+2) % SOFT_COLORS.length]} />)}
-                            </Pie>
-                            <Tooltip />
-                         </PieChart>
-                      </ResponsiveContainer>
-                   </div>
-                </div>
-             </div>
-
-             <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 text-left">
-                <div className="lg:col-span-2 bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100 text-left">
-                   <h3 className="text-sm font-bold text-slate-800 mb-6 flex items-center justify-between text-left">
-                      <span className="flex items-center gap-2 text-blue-600 text-left"><Building2 className="w-4 h-4" /> 招录大户 (Top 5)</span>
-                      {filterDept && <button onClick={() => setFilterDept(null)} className="text-[10px] text-primary hover:underline">清除筛选</button>}
-                   </h3>
-                   <p className="text-[10px] text-slate-400 mb-4 font-bold text-left">点击部门名称筛选右侧岗位</p>
-                   <div className="space-y-3">
-                      {detailData.topDepts.map((dept, i) => (
-                         <div key={i} onClick={() => setFilterDept(dept.name)} className={`p-4 rounded-2xl border transition-all cursor-pointer flex justify-between items-center ${filterDept === dept.name ? 'bg-primary text-white border-primary shadow-lg' : 'bg-slate-50 border-slate-50 hover:bg-white hover:border-slate-100'}`}>
-                            <span className="text-sm font-bold truncate pr-4">{dept.name}</span>
-                            <span className={`text-[10px] font-black px-2 py-1 rounded-lg ${filterDept === dept.name ? 'bg-white/20' : 'bg-white'}`}>{dept.value} 岗位</span>
-                         </div>
-                      ))}
-                   </div>
-                </div>
-                <div className="lg:col-span-3 bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100 text-left">
-                   <h3 className="text-sm font-bold text-slate-800 mb-6 flex items-center gap-2 text-left"><Database className="w-4 h-4 text-primary" /> 真实岗位示例</h3>
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-[500px] overflow-y-auto custom-scrollbar pr-2">
-                      {filteredSamples.length > 0 ? filteredSamples.map((job, i) => (
-                         <div key={i} onClick={() => setSelectedJob(job)} className="p-5 bg-slate-50/50 rounded-[2rem] border border-transparent hover:border-slate-100 hover:bg-white hover:shadow-lg transition-all cursor-pointer group flex flex-col justify-between text-left">
-                            <div className="text-left">
-                               <h4 className="font-bold text-slate-800 text-sm mb-1 truncate group-hover:text-primary transition-colors text-left">{job.job_name}</h4>
-                               <p className="text-[10px] text-slate-400 flex items-center gap-1 font-bold mb-3 text-left"><Building2 className="w-3 h-3" /> {job.dept_name}</p>
-                               <div className="space-y-1 text-left">
-                                  <p className="text-[10px] text-slate-400 font-medium line-clamp-2 text-left">专业要求: {job.major_req}</p>
-                               </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {trends.map((t, i) => (
+                            <div 
+                                key={t.name}
+                                onClick={() => analyzeMajor(t.name)}
+                                className="bg-white p-6 rounded-3xl border border-slate-100 hover:shadow-xl hover:border-primary/20 transition-all cursor-pointer group"
+                            >
+                                <div className="flex justify-between items-start mb-2">
+                                    <span className="text-2xl font-black text-slate-200 group-hover:text-primary/20 transition-colors">#{i+1}</span>
+                                    <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-primary transition-colors" />
+                                </div>
+                                <h4 className="font-bold text-slate-800 text-lg mb-1 truncate">{t.name}</h4>
+                                <p className="text-xs text-slate-400 font-bold">岗位数：{t.count}</p>
                             </div>
-                            <div className="mt-4 pt-3 border-t border-slate-50 flex justify-between items-center text-left">
-                               <span className="text-[9px] bg-white px-2 py-0.5 rounded-lg border border-slate-100 text-slate-500 font-bold">{job.degree_req}</span>
-                               <ChevronRight className="w-3 h-3 text-slate-200 group-hover:text-primary transition-all" />
-                            </div>
-                         </div>
-                      )) : (
-                         <div className="col-span-full h-full flex flex-col items-center justify-center text-slate-300">
-                            <Database className="w-12 h-12 opacity-20 mb-2" />
-                            <p className="text-sm font-bold">该筛选下暂无示例岗位</p>
-                         </div>
-                      )}
-                   </div>
+                        ))}
+                    </div>
                 </div>
-             </div>
-          </div>
-       )}
-       {selectedJob && renderJobDetailModal(selectedJob)}
-    </div>
+            ) : detailData ? (
+                <div className="space-y-8 animate-fade-in">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm md:col-span-2">
+                            <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2">
+                                <Target className="w-5 h-5 text-primary" /> 学历与政治面貌要求分布
+                            </h3>
+                            <div className="grid grid-cols-2 gap-4 h-[250px]">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <PieChart>
+                                        <Pie 
+                                            data={detailData.degreeStats} 
+                                            cx="50%" cy="50%" 
+                                            innerRadius={60} outerRadius={80} 
+                                            paddingAngle={5} 
+                                            dataKey="value"
+                                        >
+                                            {detailData.degreeStats.map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={SOFT_COLORS[index % SOFT_COLORS.length]} />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <PieChart>
+                                        <Pie 
+                                            data={detailData.politicStats} 
+                                            cx="50%" cy="50%" 
+                                            innerRadius={60} outerRadius={80} 
+                                            paddingAngle={5} 
+                                            dataKey="value"
+                                        >
+                                            {detailData.politicStats.map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={SOFT_COLORS[(index + 2) % SOFT_COLORS.length]} />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                            </div>
+                            <div className="flex justify-around text-xs text-slate-400 font-bold mt-2">
+                                <span>学历要求分布</span>
+                                <span>政治面貌分布</span>
+                            </div>
+                        </div>
+
+                        <div className="bg-gradient-to-br from-indigo-600 to-violet-600 text-white p-8 rounded-[2.5rem] shadow-xl shadow-indigo-100 relative overflow-hidden flex flex-col justify-center">
+                            <div className="relative z-10">
+                                <h3 className="font-bold text-indigo-100 mb-2">专业热度指数</h3>
+                                <div className="text-5xl font-black mb-4">{detailData.totalJobs} <span className="text-lg opacity-60 font-medium">个岗位</span></div>
+                                <p className="text-sm opacity-80 leading-relaxed mb-6">
+                                    库中共有 {detailData.totalJobs} 个岗位明确招收“{detailData.majorName}”及相关专业。
+                                </p>
+                                <div className="space-y-3">
+                                    <h4 className="text-xs font-bold uppercase tracking-widest opacity-60">招录大户 (Top 3)</h4>
+                                    {detailData.topDepts.slice(0, 3).map((dept, idx) => (
+                                        <div key={idx} className="flex justify-between items-center text-sm font-bold bg-white/10 px-4 py-2 rounded-xl">
+                                            <span className="truncate max-w-[150px]">{dept.name}</span>
+                                            <span className="bg-white/20 px-2 py-0.5 rounded-md text-xs">{dept.value}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="absolute top-0 right-0 w-48 h-48 bg-white opacity-5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+                        </div>
+                    </div>
+
+                    <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm p-8">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                                <Database className="w-5 h-5 text-slate-400" />
+                                关联岗位样本 ({filteredSamples.length})
+                            </h3>
+                            <div className="flex gap-2">
+                            {detailData.topDepts.slice(0, 3).map(d => (
+                                <button 
+                                    key={d.name} 
+                                    onClick={() => setFilterDept(filterDept === d.name ? null : d.name)}
+                                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${filterDept === d.name ? 'bg-primary text-white' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}
+                                >
+                                    {d.name}
+                                </button>
+                            ))}
+                            </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {filteredSamples.map(job => (
+                                <div 
+                                    key={job.id} 
+                                    onClick={() => setSelectedJob(job)}
+                                    className="p-5 rounded-3xl bg-slate-50 border border-transparent hover:border-slate-200 hover:bg-white hover:shadow-lg transition-all cursor-pointer group"
+                                >
+                                    <h4 className="font-bold text-slate-700 text-sm mb-1 truncate group-hover:text-primary">{job.job_name}</h4>
+                                    <p className="text-xs text-slate-400 mb-3 truncate">{job.dept_name}</p>
+                                    <div className="flex flex-wrap gap-1">
+                                        <span className="bg-white border border-slate-100 px-2 py-0.5 rounded text-[10px] text-slate-500">{job.degree_req}</span>
+                                        {(job.remarks?.includes('应届') || job.job_name.includes('应届')) && <span className="bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded text-[10px] text-emerald-600">应届</span>}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            ) : (
+                <div className="py-20 text-center">
+                    <Search className="w-16 h-16 text-slate-200 mx-auto mb-4" />
+                    <p className="text-slate-400 font-bold text-lg">输入专业名称开始检索</p>
+                    <p className="text-slate-300 text-sm mt-1">支持模糊搜索，如“计算机”、“会计”</p>
+                </div>
+            )}
+        </div>
+        
+        {/* Render Modal outside the animated container to prevent transform stacking context issues */}
+        {selectedJob && renderJobDetailModal(selectedJob)}
+    </>
   );
 };
 

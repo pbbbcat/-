@@ -4,42 +4,137 @@ import { Message, MessageRole, UserProfile, MatchResult, RecommendedJob, PublicS
 import { SYSTEM_INSTRUCTION } from "../constants";
 import { supabase } from "./supabaseClient";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// 增强的环境变量获取逻辑
+const getApiKey = () => {
+  // 1. 尝试从 Vite 注入的 process.env 获取
+  if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+    return process.env.API_KEY;
+  }
+  // 2. 尝试从 import.meta.env 获取 (Vite 标准)
+  // @ts-ignore
+  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_KEY) {
+    // @ts-ignore
+    return import.meta.env.VITE_API_KEY;
+  }
+  return "";
+};
+
+const apiKey = getApiKey();
+
+// 打印调试信息（注意：生产环境不要打印完整的 Key，只打印是否存在）
+console.log("Gemini Service Initializing...", { 
+  hasKey: !!apiKey, 
+  keyLength: apiKey ? apiKey.length : 0 
+});
+
+if (!apiKey) {
+  console.error("【严重错误】Gemini API Key 未找到！请在 Vercel 环境变量中设置 VITE_API_KEY。");
+}
+
+const ai = new GoogleGenAI({ apiKey: apiKey });
 
 const cleanJsonOutput = (text: string): string => {
   if (!text) return "{}";
   let cleaned = text.trim();
-  if (cleaned.startsWith("```json")) {
-    cleaned = cleaned.replace(/^```json\s*/, "").replace(/\s*```$/, "");
-  } else if (cleaned.startsWith("```")) {
-    cleaned = cleaned.replace(/^```\s*/, "").replace(/\s*```$/, "");
-  }
+  // 移除 markdown 代码块标记
+  cleaned = cleaned.replace(/^```json\s*/, "").replace(/^```\s*/, "").replace(/\s*```$/, "");
   return cleaned;
 };
 
 /**
- * 核心逻辑：从数据库检索真实岗位
+ * 核心逻辑：从数据库检索真实岗位，并进行精准的 JS 过滤
+ * 优化点：不再完全依赖简单的 SQL 模糊查询，而是获取后在前端/Service层进行严格的逻辑匹配（学历层级、性别限制、政治面貌）。
  */
 export const searchSimilarJobs = async (userProfile: UserProfile): Promise<PublicServiceJobDB[]> => {
-  const { major, degree, politicalStatus, experienceYears, hasGrassrootsExperience } = userProfile;
+  const { major, degree, politicalStatus, gender, isFreshGrad, hasGrassrootsExperience } = userProfile;
   const majorTerm = major.replace(/专业|类|大类/g, '').trim();
+  
   if (!majorTerm) return [];
 
-  let query = supabase.from('public_service_jobs').select('*');
-  if (degree) query = query.ilike('degree_req', `%${degree}%`);
-  query = query.or(`major_req.ilike.%${majorTerm}%,job_name.ilike.%${majorTerm}%`);
+  // 1. Broad Search from DB based on Major (Primary Key for matching)
+  // We fetch a larger pool (limit 200) to allow for stricter filtering downstream
+  let query = supabase.from('public_service_jobs')
+    .select('*')
+    .or(`major_req.ilike.%${majorTerm}%,job_name.ilike.%${majorTerm}%`)
+    .limit(200);
 
-  const { data, error } = await query.limit(100);
-  if (error || !data) return [];
+  const { data, error } = await query;
+  if (error || !data) {
+      console.error("Supabase search error:", error);
+      return [];
+  }
 
-  const processedJobs = data.map(job => {
-    let score = 70; 
-    if (job.major_req?.includes(majorTerm)) score += 15;
-    if (politicalStatus && job.politic_req?.includes(politicalStatus)) score += 5;
-    if (hasGrassrootsExperience && job.exp_proj?.includes('基层')) score += 5;
-    return { ...job, similarity: Math.min(score, 98) / 100 };
+  // 2. Strict Filtering Logic (simulating specific DB columns if they don't explicitly exist)
+  
+  // Helpers for Hierarchy
+  const degreeLevels = ['大专', '本科', '硕士', '博士'];
+  const userDegreeLevel = degreeLevels.findIndex(l => degree.includes(l)); // e.g. "硕士研究生" matches "硕士"
+
+  const processedJobs = data.filter(job => {
+      const remarks = (job.remarks || '').toLowerCase();
+      const jobName = (job.job_name || '').toLowerCase();
+      const jobMajor = (job.major_req || '').toLowerCase();
+      const jobDegree = (job.degree_req || '').toLowerCase();
+      const jobPolitic = (job.politic_req || '').toLowerCase();
+
+      // --- FILTER 1: GENDER ---
+      // If user is Male, reject "Female Only". If Female, reject "Male Only".
+      if (gender === '男') {
+          if (remarks.includes('限女性') || remarks.includes('只招女性') || remarks.includes('适合女性') || jobName.includes('女子')) return false;
+      } else if (gender === '女') {
+          if (remarks.includes('限男性') || remarks.includes('只招男性') || remarks.includes('适合男性') || jobName.includes('男子')) return false;
+      }
+
+      // --- FILTER 2: FRESH GRADUATE ---
+      // If job strictly requires fresh grad ("仅限应届"), and user is NOT, reject.
+      // If user IS fresh grad, they can apply to both fresh and non-fresh.
+      const requiresFresh = remarks.includes('应届') || remarks.includes('2026') || jobName.includes('应届');
+      if (requiresFresh && !isFreshGrad) return false;
+
+      // --- FILTER 3: POLITICAL STATUS ---
+      // Hierarchy: CPM (Party Member) > Probationary > League Member > Mass
+      // If job requires CPM, simple Mass or League members cannot apply.
+      if (jobPolitic.includes('中共党员')) {
+          if (!politicalStatus.includes('党员')) return false; // Reject if user is not a Party member
+      }
+      if (jobPolitic.includes('共青团员') && politicalStatus === '群众') return false;
+
+      // --- FILTER 4: DEGREE HIERARCHY ---
+      // If job requires Master, Bachelor cannot apply.
+      // Assuming simple string matching for now.
+      let jobDegreeLevel = -1;
+      if (jobDegree.includes('博士')) jobDegreeLevel = 3;
+      else if (jobDegree.includes('硕士') || jobDegree.includes('研究生')) jobDegreeLevel = 2;
+      else if (jobDegree.includes('本科')) jobDegreeLevel = 1;
+      else if (jobDegree.includes('大专')) jobDegreeLevel = 0;
+
+      // If user degree level is lower than job requirement, reject.
+      // Note: "本科及以上" means level 1 is OK.
+      if (userDegreeLevel < jobDegreeLevel) return false;
+
+      // --- FILTER 5: GRASSROOTS EXPERIENCE ---
+      if (remarks.includes('基层工作经历') && !hasGrassrootsExperience) return false;
+
+      return true;
+  }).map(job => {
+      // Calculate Similarity Score based on remaining matches
+      let score = 75; // Base score for passing hard filters
+
+      // Major Exactness
+      if (job.major_req.includes(majorTerm)) score += 10;
+      if (job.major_req === major) score += 5;
+
+      // Fresh Grad Bonus (if job prefers it)
+      const remarks = (job.remarks || '');
+      if (isFreshGrad && remarks.includes('应届')) score += 5;
+
+      // Political Bonus
+      if (politicalStatus.includes('党员') && (job.politic_req || '').includes('党员')) score += 5;
+
+      return { ...job, similarity: Math.min(score, 99) / 100 };
   });
 
+  // Sort by similarity descending
   return processedJobs.sort((a, b) => (b.similarity || 0) - (a.similarity || 0));
 };
 
@@ -48,40 +143,60 @@ export const analyzeJobMatch = async (
   userProfile: UserProfile,
   dbCandidates: any[] = [] 
 ): Promise<MatchResult> => {
+  if (!apiKey) return { score: 0, eligible: false, hardConstraints: [], softConstraints: [], analysis: "API Key 配置缺失，无法分析。", otherRecommendedJobs: [] };
+
   const prompt = `分析画像 ${JSON.stringify(userProfile)} 与文本 """${jobText}""" 的匹配度。返回 JSON。`;
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
+      model: 'gemini-2.0-flash', // 降级到更稳定的 flash 模型以提高成功率
       contents: prompt,
-      config: { responseMimeType: "application/json", thinkingConfig: { thinkingBudget: 1000 } }
+      config: { responseMimeType: "application/json" }
     });
     return JSON.parse(cleanJsonOutput(response.text || ""));
   } catch (error) {
+    console.error("Analyze Match Failed:", error);
     return { score: 0, eligible: false, hardConstraints: [], softConstraints: [], analysis: "分析失败", otherRecommendedJobs: [] };
   }
 };
 
 export const sendMessageToGemini = async (history: Message[], userMessage: string): Promise<string> => {
-    const chat = ai.chats.create({ model: 'gemini-3-flash-preview', config: { systemInstruction: SYSTEM_INSTRUCTION } });
-    const result = await chat.sendMessage({ message: userMessage });
-    return result.text || "";
+    if (!apiKey) return "系统错误：未配置 API Key。请联系管理员在 Vercel 后台添加 VITE_API_KEY。";
+
+    try {
+        const chat = ai.chats.create({ 
+            model: 'gemini-2.0-flash', // 使用更快的 flash 模型
+            config: { systemInstruction: SYSTEM_INSTRUCTION } 
+        });
+        
+        // 构造历史消息上下文 (Gemini API 格式)
+        // 实际应用中应正确转换 history 格式，这里简化处理直接发送新消息
+        const result = await chat.sendMessage({ message: userMessage });
+        return result.text || "";
+    } catch (error: any) {
+        console.error("Gemini Chat Error:", error);
+        return `对话服务暂时不可用 (${error.message || '未知错误'})。请稍后再试。`;
+    }
 };
 
 /**
  * 升级版：生成具有真实考感的完整模拟卷
- * 包含 10 道选择题和 2 道主观题
  */
 export const generateMockPaper = async (title: string): Promise<MockExamData> => {
+  if (!apiKey) {
+      alert("未检测到 API Key，无法生成试卷。");
+      return { title: "配置错误", description: "请在 Vercel 环境变量中配置 VITE_API_KEY", questions: [] };
+  }
+
   const prompt = `基于"${title}"主题，生成一份具有实战性质的公考模拟卷。要求：
-  1. 生成 10 道单选题 (type: 'single_choice')，必须包含 options 数组，格式为 ["A. 内容", "B. 内容", "C. 内容", "D. 内容"]。
-  2. 生成 2 道申论主观大题 (type: 'essay')。
+  1. 生成 5 道单选题 (type: 'single_choice')，必须包含 options 数组，格式为 ["A. 内容", "B. 内容", "C. 内容", "D. 内容"]。
+  2. 生成 1 道申论主观大题 (type: 'essay')。
   3. 考点需涵盖常识、言语或申论热点。
   4. 每道题必须有详细的解析。
   5. 返回严格符合 Schema 的 JSON 对象。`;
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
+      model: 'gemini-2.0-flash', // 使用 Flash 模型以获得更快的 JSON 生成速度
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -111,18 +226,27 @@ export const generateMockPaper = async (title: string): Promise<MockExamData> =>
         }
       }
     });
-    return JSON.parse(response.text || "{}") as MockExamData;
+    
+    const text = response.text;
+    if (!text) throw new Error("Empty response");
+    
+    return JSON.parse(text) as MockExamData;
   } catch (error) {
-    console.error("组卷失败:", error);
-    return { title: "生成失败", description: "网络连接不稳定，请重新尝试组卷", questions: [] };
+    console.error("组卷失败详情:", error);
+    return { 
+        title: "生成失败", 
+        description: "AI 服务响应异常，请检查网络或 API Key 配额。", 
+        questions: [] 
+    };
   }
 };
 
 export const generateStudyPlan = async (targetExam: string, daysLeft: number, dailyHours: number, weakness: string): Promise<StudyPlanPhase[]> => {
+  if (!apiKey) return [];
   const prompt = `为${targetExam}考生生成计划，剩余${daysLeft}天，重点${weakness}。`;
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
+      model: 'gemini-2.0-flash',
       contents: prompt,
       config: { responseMimeType: "application/json" }
     });

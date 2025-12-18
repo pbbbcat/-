@@ -22,9 +22,11 @@ export interface User {
 }
 
 export interface UserProfile {
-  degree: string;
-  major: string;
-  politicalStatus: string;
+  gender: string;          // Gender (男/女)
+  degree: string;          // Highest Degree
+  major: string;           // Major
+  politicalStatus: string; // Political Status
+  isFreshGrad: boolean;    // Is Fresh Graduate (2026届)
   experienceYears: number;
   hasGrassrootsExperience: boolean;
   certificates: string[];

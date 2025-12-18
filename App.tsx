@@ -22,14 +22,23 @@ const App: React.FC = () => {
   
   const [userProfile, setUserProfile] = useState<UserProfile>(() => {
     const saved = localStorage.getItem('app_user_profile');
-    return saved ? JSON.parse(saved) : {
+    const defaultProfile: UserProfile = {
+        gender: '男',
         degree: '本科',
         major: '',
         politicalStatus: '群众',
+        isFreshGrad: true,
         experienceYears: 0,
         hasGrassrootsExperience: false,
         certificates: []
     };
+    
+    if (saved) {
+        const parsed = JSON.parse(saved);
+        // Merge with default to handle legacy data without new fields
+        return { ...defaultProfile, ...parsed };
+    }
+    return defaultProfile;
   });
 
   useEffect(() => {

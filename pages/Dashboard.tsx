@@ -48,7 +48,12 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate, userProfile }) => {
             }
             const { count } = await supabase.from('public_service_jobs').select('*', { count: 'exact', head: true });
             setStats({ totalJobs: count || 0 });
-            const { data: latestData } = await supabase.from('public_service_jobs').select('*').order('id', { ascending: false }).limit(5);
+            // Fetch latest jobs
+            const { data: latestData } = await supabase
+                .from('public_service_jobs')
+                .select('*')
+                .order('id', { ascending: false })
+                .limit(5);
             if (latestData) setLatestJobs(latestData);
         } catch (error) {
             console.error("Dashboard data fetch failed:", error);
@@ -58,6 +63,20 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate, userProfile }) => {
     };
     fetchRealData();
   }, [userProfile]);
+
+  // 智能跳转逻辑
+  const handleApplyUrl = (url?: string) => {
+    const FALLBACK_URL = 'http://bm.scs.gov.cn/pp/gkweb/core/web/ui/business/home/gkhome.html';
+    if (!url || url.trim() === '#' || url.trim().length < 5) {
+      window.open(FALLBACK_URL, '_blank');
+      return;
+    }
+    let targetUrl = url.trim();
+    if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+      targetUrl = 'https://' + targetUrl;
+    }
+    window.open(targetUrl, '_blank');
+  };
 
   const renderJobModal = () => {
     if (!selectedJob) return null;
@@ -113,7 +132,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate, userProfile }) => {
                 </button>
                 <button 
                     className="px-8 py-3 bg-primary text-white font-bold rounded-2xl shadow-xl shadow-indigo-100 hover:bg-indigo-600 transition-all active:scale-95 flex items-center gap-2"
-                    onClick={() => window.open(selectedJob.website || '#', '_blank')}
+                    onClick={() => handleApplyUrl(selectedJob.website)}
                 >
                     立即报名
                     <ExternalLink className="w-4 h-4" />
@@ -235,9 +254,15 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate, userProfile }) => {
                 <div className="flex-1 overflow-y-auto space-y-4 custom-scrollbar pr-2">
                     {latestJobs.map((job) => (
                         <div key={job.id} onClick={() => setSelectedJob(job)} className="group cursor-pointer p-4 rounded-2xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100">
-                            <h4 className="font-bold text-slate-700 text-sm mb-1 line-clamp-1 group-hover:text-primary transition-colors">{job.job_name}</h4>
+                            {/* 优先显示用人司局（sub_dept），如果没有则显示职位名称。防止出现全是“一级主任科员”的情况 */}
+                            <h4 className="font-bold text-slate-700 text-sm mb-1 line-clamp-1 group-hover:text-primary transition-colors">
+                                {job.sub_dept || job.job_name}
+                            </h4>
                             <p className="text-[10px] text-slate-400 flex items-center gap-1 font-medium">
-                                <Building2 className="w-3 h-3" /> {job.dept_name}
+                                <Building2 className="w-3 h-3" /> 
+                                {job.dept_name}
+                                {/* 如果显示了sub_dept，则把job_name放在副标题 */}
+                                {job.sub_dept && <span className="opacity-60"> · {job.job_name}</span>}
                             </p>
                         </div>
                     ))}

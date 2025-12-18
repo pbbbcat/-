@@ -65,6 +65,13 @@ const ResourceCenter: React.FC = () => {
         }
     };
 
+    const handleOpenUrl = (url?: string) => {
+      if (!url) return;
+      let target = url.trim();
+      if (!target.startsWith('http')) target = 'https://' + target;
+      window.open(target, '_blank');
+    };
+
     const filteredItems = items.filter(item => {
         const matchesSearch = item.title.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesCat = filterCategory === 'all' || item.category === filterCategory;
@@ -283,7 +290,7 @@ const ResourceCenter: React.FC = () => {
                                 
                                 {activeTab === 'news' ? (
                                     <button 
-                                      onClick={() => window.open(item.url, '_blank')} 
+                                      onClick={() => handleOpenUrl(item.url)} 
                                       className="px-8 py-3 bg-emerald-600 text-white font-black rounded-2xl text-xs shadow-xl shadow-emerald-100 hover:bg-emerald-700 flex items-center gap-2 active:scale-95 transition-all"
                                     >
                                       <ExternalLink className="w-4 h-4" /> 阅读原文
