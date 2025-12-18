@@ -192,7 +192,7 @@ export const fetchPolicyArticles = async (): Promise<ResourceItem[]> => {
             type: 'policy', 
             category: '指南',
             publishDate: '2025-12-10', 
-            summary: '梳理了2026年录用考察环节的最新红线要求。',
+            summary: '梳理了2026年录用考察环节的最新红线要求，包含家属政审、社交账号审查等细节说明。',
             tags: ['政审', '录用考察'], 
             url: 'http://www.dangjian.com/' 
         },
@@ -203,9 +203,53 @@ export const fetchPolicyArticles = async (): Promise<ResourceItem[]> => {
             type: 'policy', 
             category: '公告',
             publishDate: '2025-12-18', 
-            summary: '明确了2024-2026届应届生在省考中的身份认定标准。',
+            summary: '明确了2024-2026届应届生在省考中的身份认定标准，部分省份博士生报考年龄已放宽至40周岁。',
             tags: ['报考政策', '身份认定'], 
             url: 'http://www.moe.gov.cn/' 
+        },
+        { 
+            id: 'p-2026-tax-policy', 
+            title: '2026税务系统招录新规：总局与省局岗位对专业背景的最新划分', 
+            source: '国家税务总局', 
+            type: 'policy', 
+            category: '解读',
+            publishDate: '2025-12-12', 
+            summary: '税务系统作为招录大户，今年对审计、数学统计类专业的需求进一步提升，取消了部分职位的英语四级限制。',
+            tags: ['税务系统', '专业目录'], 
+            url: 'http://www.chinatax.gov.cn/' 
+        },
+        { 
+            id: 'p-grassroots-exp', 
+            title: '基层工作经历如何认定？2026年国考报名常见误区解析', 
+            source: '新华网教育', 
+            type: 'policy', 
+            category: '指南',
+            publishDate: '2025-12-08', 
+            summary: '详细说明了大学生村官、三支一扶、特岗教师等项目的基层经历计算方式，以及企业社保记录的认定标准。',
+            tags: ['基层经历', '报名指导'], 
+            url: 'http://www.xinhuanet.com/education/' 
+        },
+        { 
+            id: 'p-discipline-inspection', 
+            title: '纪检监察系统专项招录：2026年政治考察与面试环节的专业性侧重', 
+            source: '中央纪委国家监委', 
+            type: 'policy', 
+            category: '公告',
+            publishDate: '2025-12-14', 
+            summary: '纪检岗面试题目将更偏向实务处理。建议考生关注廉政文化建设与最新监督执纪规程。',
+            tags: ['纪检监察', '面试指南'], 
+            url: 'https://www.ccdi.gov.cn/' 
+        },
+        { 
+            id: 'p-reserve-officer', 
+            title: '退役军人报考公务员优待政策：2026年定向岗位规模创历史新高', 
+            source: '退役军人事务部', 
+            type: 'policy', 
+            category: '公告',
+            publishDate: '2025-12-16', 
+            summary: '各省拿出不低于10%的基层公务员岗位定向招录退役军人。针对士兵考公的加分项目也有所增加。',
+            tags: ['退役军人', '专项招录'], 
+            url: 'http://www.mva.gov.cn/' 
         }
     ];
 };
