@@ -24,8 +24,9 @@ const getEnv = (key: string, viteKey: string, vercelKey: string, fallback: strin
 };
 
 const supabaseUrl = getEnv('SUPABASE_URL', 'VITE_SUPABASE_URL', 'SUPABASE_URL', 'https://jgotbqvymecdxnqlgouo.supabase.co');
-// 增加对 SUPABASE_ANON_KEY 的支持 (Vercel 默认名称)
-const supabaseKey = getEnv('SUPABASE_KEY', 'VITE_SUPABASE_ANON_KEY', 'SUPABASE_ANON_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impnb3RicXZ5bWVjZHhucWxnb3VvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NDA1Mzg0NSwiZXhwIjoyMDc5NjI5ODQ1fQ.YSS2vtyMbwYt2bCHnlKhGGmqud0vH_Ma1ZbYk2X1I2I');
+
+// 更新：优先检查 SUPABASE_SERVICE_KEY (对应 Vercel 配置)
+const supabaseKey = getEnv('SUPABASE_KEY', 'VITE_SUPABASE_SERVICE_KEY', 'SUPABASE_SERVICE_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impnb3RicXZ5bWVjZHhucWxnb3VvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NDA1Mzg0NSwiZXhwIjoyMDc5NjI5ODQ1fQ.YSS2vtyMbwYt2bCHnlKhGGmqud0vH_Ma1ZbYk2X1I2I');
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
