@@ -14,6 +14,17 @@ const cleanJsonOutput = (text: string): string => {
   return cleaned;
 };
 
+// 统一错误处理辅助函数
+const handleGeminiError = (error: any, context: string): string => {
+    const errorMsg = error.message || JSON.stringify(error);
+    console.error(`Gemini API Error [${context}]:`, error);
+
+    if (errorMsg.includes('429') || errorMsg.includes('quota') || errorMsg.includes('RESOURCE_EXHAUSTED')) {
+        return "⚠️ 服务繁忙：API 调用次数超限（429）。\n原因：当前使用的 API Key 触发了 Google 的频率限制。\n建议：请等待 1-2 分钟后再试，避免频繁点击生成。";
+    }
+    return `服务暂时不可用：${errorMsg.substring(0, 50)}...`;
+};
+
 /**
  * 核心逻辑：从数据库检索真实岗位，并进行精准的 JS 过滤
  * 优化点：不再完全依赖简单的 SQL 模糊查询，而是获取后在前端/Service层进行严格的逻辑匹配（学历层级、性别限制、政治面貌）。
@@ -121,14 +132,21 @@ export const analyzeJobMatch = async (
   const prompt = `分析画像 ${JSON.stringify(userProfile)} 与文本 """${jobText}""" 的匹配度。返回 JSON。`;
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview', // 使用推荐的 3.0 Flash 模型
+      model: 'gemini-3-flash-preview', 
       contents: prompt,
       config: { responseMimeType: "application/json" }
     });
     return JSON.parse(cleanJsonOutput(response.text || ""));
-  } catch (error) {
-    console.error("Analyze Match Failed:", error);
-    return { score: 0, eligible: false, hardConstraints: [], softConstraints: [], analysis: "分析失败", otherRecommendedJobs: [] };
+  } catch (error: any) {
+    const friendlyMsg = handleGeminiError(error, "Analyze Match");
+    return { 
+        score: 0, 
+        eligible: false, 
+        hardConstraints: [], 
+        softConstraints: [], 
+        analysis: friendlyMsg, 
+        otherRecommendedJobs: [] 
+    };
   }
 };
 
@@ -137,7 +155,7 @@ export const sendMessageToGemini = async (history: Message[], userMessage: strin
 
     try {
         const chat = ai.chats.create({ 
-            model: 'gemini-3-flash-preview', // 使用推荐的 3.0 Flash 模型
+            model: 'gemini-3-flash-preview', 
             config: { systemInstruction: SYSTEM_INSTRUCTION } 
         });
         
@@ -146,8 +164,7 @@ export const sendMessageToGemini = async (history: Message[], userMessage: strin
         const result = await chat.sendMessage({ message: userMessage });
         return result.text || "";
     } catch (error: any) {
-        console.error("Gemini Chat Error:", error);
-        return `对话服务暂时不可用 (${error.message || '未知错误'})。请稍后再试。`;
+        return handleGeminiError(error, "Chat");
     }
 };
 
@@ -169,7 +186,7 @@ export const generateMockPaper = async (title: string): Promise<MockExamData> =>
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview', // 使用推荐的 3.0 Flash 模型以获得更快的 JSON 生成速度
+      model: 'gemini-3-flash-preview',
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -204,11 +221,11 @@ export const generateMockPaper = async (title: string): Promise<MockExamData> =>
     if (!text) throw new Error("Empty response");
     
     return JSON.parse(text) as MockExamData;
-  } catch (error) {
-    console.error("组卷失败详情:", error);
+  } catch (error: any) {
+    const friendlyMsg = handleGeminiError(error, "Mock Paper");
     return { 
-        title: "生成失败", 
-        description: "AI 服务响应异常，请检查网络或 API Key 配额。", 
+        title: "生成失败：服务繁忙", 
+        description: friendlyMsg, 
         questions: [] 
     };
   }
@@ -219,10 +236,13 @@ export const generateStudyPlan = async (targetExam: string, daysLeft: number, da
   const prompt = `为${targetExam}考生生成计划，剩余${daysLeft}天，重点${weakness}。`;
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview', // 使用推荐的 3.0 Flash 模型
+      model: 'gemini-3-flash-preview', 
       contents: prompt,
       config: { responseMimeType: "application/json" }
     });
     return JSON.parse(cleanJsonOutput(response.text || "[]"));
-  } catch (error) { return []; }
+  } catch (error) { 
+      console.error("Study Plan Error:", error);
+      return []; 
+  }
 };
