@@ -41,9 +41,9 @@ const MajorAnalysis: React.FC = () => {
           const counts: Record<string, number> = {};
           data.forEach(row => {
               if (!row.major_req) return;
-              // 显式指定参数 s 为 string 类型
+              // Fix TS7006: Explicitly type 's' as string
               const parts = row.major_req.split(/[,，、]/).map((s: string) => s.trim());
-              // 显式指定参数 p 为 string 类型
+              // Fix TS7006: Explicitly type 'p' as string
               parts.forEach((p: string) => {
                   if (p.length > 1 && !['不限', '无限制', '专业'].includes(p)) {
                       const key = p.replace(/[（(].*[)）]/, '').substring(0, 8); 
@@ -232,7 +232,8 @@ const MajorAnalysis: React.FC = () => {
                             <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fontWeight: 700, fill: '#94A3B8'}} />
                             <YAxis hide />
                             <Tooltip cursor={{fill: '#F8FAFC'}} contentStyle={{borderRadius: '24px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}} />
-                            <Bar dataKey="count" fill="#3B82F6" radius={[12, 12, 12, 12]} barSize={40} className="cursor-pointer" onClick={(d: any) => d && d.name && analyzeMajor(d.name)} />
+                            {/* Fix TS2345: Cast d.name to string when calling analyzeMajor */}
+                            <Bar dataKey="count" fill="#3B82F6" radius={[12, 12, 12, 12]} barSize={40} className="cursor-pointer" onClick={(d: any) => d && d.name && analyzeMajor(d.name as string)} />
                         </BarChart>
                     </ResponsiveContainer>
                 </div>
