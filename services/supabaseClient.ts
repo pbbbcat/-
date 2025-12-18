@@ -2,18 +2,24 @@
 import { createClient } from '@supabase/supabase-js';
 
 const getEnv = (key: string, viteKey: string, fallback: string) => {
-  try {
-    if (typeof process !== 'undefined' && process.env) {
-      return process.env[key] || process.env[viteKey] || fallback;
-    }
-  } catch (e) { }
+  // 1. 尝试 Vite 特有的环境变量访问方式
   try {
     // @ts-ignore
     if (typeof import.meta !== 'undefined' && import.meta.env) {
       // @ts-ignore
-      return import.meta.env[key] || import.meta.env[viteKey] || fallback;
+      const val = import.meta.env[key] || import.meta.env[viteKey];
+      if (val) return val;
     }
-  } catch (e) { }
+  } catch (e) {}
+
+  // 2. 尝试传统的 process.env 访问方式
+  try {
+    if (typeof process !== 'undefined' && process.env) {
+      const val = process.env[key] || process.env[viteKey];
+      if (val) return val;
+    }
+  } catch (e) {}
+
   return fallback;
 };
 
@@ -37,9 +43,6 @@ export const getSignedFileUrl = async (bucket: string, path: string): Promise<st
     }
 };
 
-/**
- * Upload a file to a specific bucket
- */
 export const uploadFile = async (bucket: string, path: string, file: File) => {
     const { data, error } = await supabase.storage.from(bucket).upload(path, file, {
         upsert: true
