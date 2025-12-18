@@ -4,32 +4,8 @@ import { Message, MessageRole, UserProfile, MatchResult, RecommendedJob, PublicS
 import { SYSTEM_INSTRUCTION } from "../constants";
 import { supabase } from "./supabaseClient";
 
-// Helper to safely get env vars without crashing if 'process' is undefined
-const getEnv = (key: string, viteKey: string, fallback: string) => {
-  try {
-    if (typeof process !== 'undefined' && process.env) {
-      return process.env[key] || process.env[viteKey] || fallback;
-    }
-  } catch (e) {
-    // Ignore error
-  }
-  
-  try {
-    // @ts-ignore
-    if (typeof import.meta !== 'undefined' && import.meta.env) {
-      // @ts-ignore
-      return import.meta.env[key] || import.meta.env[viteKey] || fallback;
-    }
-  } catch (e) {
-     // Ignore error
-  }
-
-  return fallback;
-};
-
-// Configuration from environment variables or fallback
-const apiKey = getEnv('API_KEY', 'VITE_API_KEY', 'AIzaSyD8aZrl7No0BEq80HbWDr3Zo8W2UvHyvNk');
-const ai = new GoogleGenAI({ apiKey });
+// Fix: Always use process.env.API_KEY directly for GoogleGenAI initialization as per guidelines
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // Helper to clean JSON output from LLM to prevent parsing errors
 const cleanJsonOutput = (text: string): string => {
@@ -95,8 +71,6 @@ const localHeuristicAnalyze = (jobText: string, profile: UserProfile, dbCandidat
  * ROBUST VERSION: Gets IDs from RPC, then fetches FULL details from table.
  */
 const performVectorSearch = async (queryText: string, limit: number = 10): Promise<PublicServiceJobDB[]> => {
-    if (!apiKey) return [];
-    
     try {
         // 1. Generate Embedding
         const result = await ai.models.embedContent({
@@ -176,13 +150,14 @@ export const sendMessageToGemini = async (
         retrievedJobs.map(job => 
             `- 部门：${job.dept_name} | 职位：${job.job_name}\n  专业要求：${job.major_req}\n  备注：${job.remarks || '无'}\n  招考人数: ${job.recruit_count || '未说明'}`
         ).join("\n\n");
-        contextString += "\n\n(指令：请根据以上数据库中的真实岗位信息回答用户。如果用户询问推荐，请优先推荐这些岗位。)";
+        contextString += "\n\n(指令：请根据以上数据库中的真实岗位信息回答用户。如果用户询问推荐，请优先推荐 these 岗位。)";
     } else {
         contextString = "\n\n(指令：知识库中暂无高度相关的特定岗位，请基于通用公考政策回答。)";
     }
     // -------------------------------------------
 
-    const modelId = 'gemini-2.5-flash';
+    // Fix: Using gemini-3-flash-preview for basic Q&A as per guidelines
+    const modelId = 'gemini-3-flash-preview';
     const recentHistory = history.slice(-6).map(msg => ({
       role: msg.role === MessageRole.USER ? 'user' : 'model',
       parts: [{ text: msg.content }],
@@ -201,6 +176,7 @@ export const sendMessageToGemini = async (
       message: userMessage
     });
 
+    // Fix: Access .text property directly (do not call as function)
     return result.text || "抱歉，我暂时无法回答这个问题。";
 
   } catch (error) {
@@ -211,24 +187,18 @@ export const sendMessageToGemini = async (
 
 /**
  * Enhanced Search: Hybrid Approach (Keyword Match + Vector Search)
- * 1. Extract Core Keyword (e.g., "Computer Science" -> "Computer")
- * 2. Perform Keyword Search (Supabase ILIKE)
- * 3. Perform Vector Search (Gemini Embedding)
- * 4. STRICTLY Filter Vector Results by Keyword (No Hallucinations)
  */
 export const searchSimilarJobs = async (userProfile: UserProfile): Promise<PublicServiceJobDB[]> => {
   let keywordMatches: PublicServiceJobDB[] = [];
   
-  // Advanced Regex: Remove common suffixes to isolate the 'root' major
   const rawMajor = userProfile.major || '';
   const majorTerm = rawMajor
-    .replace(/科学与技术|科学|技术|工程|专业|门类|类|大类|硕士|研究生|博士|学位|学术|型|全日制|学历|学位|文学/g, '') // Long suffixes
-    .replace(/学$/g, '') // Remove trailing '学' (e.g. 会计学 -> 会计)
+    .replace(/科学与技术|科学|技术|工程|专业|门类|类|大类|硕士|研究生|博士|学位|学术|型|全日制|学历|学位|文学/g, '')
+    .replace(/学$/g, '')
     .trim();
 
   console.log(`Core Major Extraction: "${rawMajor}" -> "${majorTerm}"`);
 
-  // 1. Keyword Exact Match (High Precision)
   if (majorTerm.length >= 1) {
     const { data, error } = await supabase
         .from('public_service_jobs')
@@ -241,11 +211,9 @@ export const searchSimilarJobs = async (userProfile: UserProfile): Promise<Publi
     }
   }
 
-  // 2. Vector Semantic Search (High Recall)
   const queryText = `${userProfile.major} 专业 ${userProfile.degree} 学历 ${userProfile.politicalStatus} 公务员岗位`;
   const vectorMatches = await performVectorSearch(queryText, 50);
 
-  // 3. STRICT FILTERING for Vector Results (CRITICAL UPGRADE)
   let filteredVectorMatches: PublicServiceJobDB[] = [];
 
   if (majorTerm.length >= 1) {
@@ -257,7 +225,6 @@ export const searchSimilarJobs = async (userProfile: UserProfile): Promise<Publi
       filteredVectorMatches = vectorMatches;
   }
 
-  // 4. Merge and Deduplicate
   const combined = [...keywordMatches, ...filteredVectorMatches];
   const uniqueMap = new Map();
   combined.forEach(job => {
@@ -274,7 +241,6 @@ export const analyzeJobMatch = async (
   userProfile: UserProfile,
   dbCandidates: any[] = [] 
 ): Promise<MatchResult> => {
-  // ... (No changes to analyzeJobMatch function content, kept for context) ...
   if (!jobText || jobText.length < 5) {
       throw new Error("岗位文本内容过少，无法分析");
   }
@@ -298,12 +264,14 @@ export const analyzeJobMatch = async (
   `;
 
   try {
+    // Fix: Using gemini-3-pro-preview for complex reasoning tasks as per guidelines
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3-pro-preview',
       contents: prompt,
       config: { responseMimeType: "application/json" }
     });
 
+    // Fix: Access .text property directly
     const text = cleanJsonOutput(response.text || "");
     if (!text) throw new Error("Empty response");
     const parsed = JSON.parse(text) as MatchResult;
@@ -325,7 +293,6 @@ export const analyzeJobMatch = async (
 };
 
 export const fetchAIExamCalendar = async (): Promise<ExamEvent[]> => {
-    // ... (Existing implementation kept for fallback, though we use resourceService for main data)
     return [];
 };
 
@@ -359,8 +326,9 @@ export const generateStudyPlan = async (
     `;
 
     try {
+        // Fix: Using gemini-3-pro-preview for complex planning tasks
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-3-pro-preview',
             contents: prompt,
             config: { responseMimeType: "application/json" }
         });
@@ -428,8 +396,9 @@ export const generateMockPaper = async (paperTitle: string): Promise<MockExamDat
     `;
 
     try {
+        // Fix: Using gemini-3-pro-preview for creative/structured generation tasks
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-3-pro-preview',
             contents: prompt,
             config: { responseMimeType: "application/json" }
         });

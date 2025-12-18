@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import JobMatching from './pages/JobMatching';
@@ -8,20 +8,52 @@ import MajorAnalysis from './pages/MajorAnalysis';
 import ExamCalendar from './pages/ExamCalendar';
 import ResourceCenter from './pages/ResourceCenter';
 import Community from './pages/Community';
-import { Page, UserProfile } from './types';
+import Login from './components/Login';
+import SettingsModal from './components/SettingsModal';
+import { Page, UserProfile, User } from './types';
 
 const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<Page>(Page.DASHBOARD);
-  
-  // Reset User Profile to defaults. No hardcoded persona.
-  const [userProfile, setUserProfile] = useState<UserProfile>({
-    degree: '本科', // Default common degree
-    major: '',      // Empty: User must input
-    politicalStatus: '群众',
-    experienceYears: 0,
-    hasGrassrootsExperience: false,
-    certificates: []
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    const saved = localStorage.getItem('app_current_user');
+    return saved ? JSON.parse(saved) : null;
   });
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  
+  const [userProfile, setUserProfile] = useState<UserProfile>(() => {
+    const saved = localStorage.getItem('app_user_profile');
+    return saved ? JSON.parse(saved) : {
+        degree: '本科',
+        major: '',
+        politicalStatus: '群众',
+        experienceYears: 0,
+        hasGrassrootsExperience: false,
+        certificates: []
+    };
+  });
+
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem('app_current_user', JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem('app_current_user');
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
+    localStorage.setItem('app_user_profile', JSON.stringify(userProfile));
+  }, [userProfile]);
+
+  const handleLogin = (user: User) => {
+    setCurrentUser(user);
+    setCurrentPage(Page.DASHBOARD);
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setIsSettingsOpen(false);
+    setCurrentPage(Page.DASHBOARD);
+  };
 
   const renderPage = () => {
     switch (currentPage) {
@@ -44,10 +76,30 @@ const App: React.FC = () => {
     }
   };
 
+  if (!currentUser) {
+    return <Login onLogin={handleLogin} />;
+  }
+
   return (
-    <Layout currentPage={currentPage} onNavigate={setCurrentPage}>
-      {renderPage()}
-    </Layout>
+    <div className="relative">
+        <Layout 
+            currentPage={currentPage} 
+            onNavigate={setCurrentPage} 
+            user={currentUser}
+            onOpenSettings={() => setIsSettingsOpen(true)}
+            onLogout={handleLogout}
+        >
+          {renderPage()}
+        </Layout>
+        
+        {isSettingsOpen && (
+            <SettingsModal 
+                user={currentUser} 
+                onClose={() => setIsSettingsOpen(false)} 
+                onLogout={handleLogout}
+            />
+        )}
+    </div>
   );
 };
 
