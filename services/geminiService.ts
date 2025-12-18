@@ -121,7 +121,7 @@ export const analyzeJobMatch = async (
   const prompt = `分析画像 ${JSON.stringify(userProfile)} 与文本 """${jobText}""" 的匹配度。返回 JSON。`;
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash', // 降级到更稳定的 flash 模型以提高成功率
+      model: 'gemini-3-flash-preview', // 使用推荐的 3.0 Flash 模型
       contents: prompt,
       config: { responseMimeType: "application/json" }
     });
@@ -137,7 +137,7 @@ export const sendMessageToGemini = async (history: Message[], userMessage: strin
 
     try {
         const chat = ai.chats.create({ 
-            model: 'gemini-2.0-flash', // 使用更快的 flash 模型
+            model: 'gemini-3-flash-preview', // 使用推荐的 3.0 Flash 模型
             config: { systemInstruction: SYSTEM_INSTRUCTION } 
         });
         
@@ -169,7 +169,7 @@ export const generateMockPaper = async (title: string): Promise<MockExamData> =>
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash', // 使用 Flash 模型以获得更快的 JSON 生成速度
+      model: 'gemini-3-flash-preview', // 使用推荐的 3.0 Flash 模型以获得更快的 JSON 生成速度
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -219,7 +219,7 @@ export const generateStudyPlan = async (targetExam: string, daysLeft: number, da
   const prompt = `为${targetExam}考生生成计划，剩余${daysLeft}天，重点${weakness}。`;
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
+      model: 'gemini-3-flash-preview', // 使用推荐的 3.0 Flash 模型
       contents: prompt,
       config: { responseMimeType: "application/json" }
     });
