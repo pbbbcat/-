@@ -4,34 +4,7 @@ import { Message, MessageRole, UserProfile, MatchResult, RecommendedJob, PublicS
 import { SYSTEM_INSTRUCTION } from "../constants";
 import { supabase } from "./supabaseClient";
 
-// 增强的环境变量获取逻辑
-const getApiKey = () => {
-  // 1. 尝试从 Vite 注入的 process.env 获取
-  if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
-    return process.env.API_KEY;
-  }
-  // 2. 尝试从 import.meta.env 获取 (Vite 标准)
-  // @ts-ignore
-  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_KEY) {
-    // @ts-ignore
-    return import.meta.env.VITE_API_KEY;
-  }
-  return "";
-};
-
-const apiKey = getApiKey();
-
-// 打印调试信息（注意：生产环境不要打印完整的 Key，只打印是否存在）
-console.log("Gemini Service Initializing...", { 
-  hasKey: !!apiKey, 
-  keyLength: apiKey ? apiKey.length : 0 
-});
-
-if (!apiKey) {
-  console.error("【严重错误】Gemini API Key 未找到！请在 Vercel 环境变量中设置 VITE_API_KEY。");
-}
-
-const ai = new GoogleGenAI({ apiKey: apiKey });
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 const cleanJsonOutput = (text: string): string => {
   if (!text) return "{}";
@@ -143,7 +116,7 @@ export const analyzeJobMatch = async (
   userProfile: UserProfile,
   dbCandidates: any[] = [] 
 ): Promise<MatchResult> => {
-  if (!apiKey) return { score: 0, eligible: false, hardConstraints: [], softConstraints: [], analysis: "API Key 配置缺失，无法分析。", otherRecommendedJobs: [] };
+  if (!process.env.API_KEY) return { score: 0, eligible: false, hardConstraints: [], softConstraints: [], analysis: "API Key 配置缺失，无法分析。", otherRecommendedJobs: [] };
 
   const prompt = `分析画像 ${JSON.stringify(userProfile)} 与文本 """${jobText}""" 的匹配度。返回 JSON。`;
   try {
@@ -160,7 +133,7 @@ export const analyzeJobMatch = async (
 };
 
 export const sendMessageToGemini = async (history: Message[], userMessage: string): Promise<string> => {
-    if (!apiKey) return "系统错误：未配置 API Key。请联系管理员在 Vercel 后台添加 VITE_API_KEY。";
+    if (!process.env.API_KEY) return "系统错误：未配置 API Key。请联系管理员在 Vercel 后台添加 VITE_API_KEY。";
 
     try {
         const chat = ai.chats.create({ 
@@ -182,7 +155,7 @@ export const sendMessageToGemini = async (history: Message[], userMessage: strin
  * 升级版：生成具有真实考感的完整模拟卷
  */
 export const generateMockPaper = async (title: string): Promise<MockExamData> => {
-  if (!apiKey) {
+  if (!process.env.API_KEY) {
       alert("未检测到 API Key，无法生成试卷。");
       return { title: "配置错误", description: "请在 Vercel 环境变量中配置 VITE_API_KEY", questions: [] };
   }
@@ -242,7 +215,7 @@ export const generateMockPaper = async (title: string): Promise<MockExamData> =>
 };
 
 export const generateStudyPlan = async (targetExam: string, daysLeft: number, dailyHours: number, weakness: string): Promise<StudyPlanPhase[]> => {
-  if (!apiKey) return [];
+  if (!process.env.API_KEY) return [];
   const prompt = `为${targetExam}考生生成计划，剩余${daysLeft}天，重点${weakness}。`;
   try {
     const response = await ai.models.generateContent({

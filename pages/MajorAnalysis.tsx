@@ -294,7 +294,7 @@ const MajorAnalysis: React.FC = () => {
                                         fill="#6366f1" 
                                         radius={[8, 8, 0, 0]} 
                                         barSize={40} 
-                                        onClick={(data) => data && analyzeMajor(data.name)}
+                                        onClick={(data) => data && data.name && analyzeMajor(data.name)}
                                         cursor="pointer"
                                     />
                                 </BarChart>
