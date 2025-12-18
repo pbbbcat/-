@@ -53,10 +53,10 @@ const MajorAnalysis: React.FC = () => {
           const { data } = await supabase.from('public_service_jobs').select('major_req').not('major_req', 'is', null).limit(1000); 
           if (!data) return;
           const counts: Record<string, number> = {};
-          data.forEach(row => {
+          data.forEach((row: { major_req: string | null }) => {
               if (!row.major_req) return;
-              const parts = row.major_req.split(/[,，、]/).map(s => s.trim());
-              parts.forEach(p => {
+              const parts = row.major_req.split(/[,，、]/).map((s: string) => s.trim());
+              parts.forEach((p: string) => {
                   if (p.length > 2 && !['不限', '无限制'].includes(p)) {
                       const key = p.replace(/[（(].*[)）]/, ''); 
                       counts[key] = (counts[key] || 0) + 1;
@@ -75,7 +75,7 @@ const MajorAnalysis: React.FC = () => {
           const degreeMap: Record<string, number> = {};
           const politicMap: Record<string, number> = {};
           const deptMap: Record<string, number> = {};
-          data.forEach(j => {
+          data.forEach((j: PublicServiceJobDB) => {
               degreeMap[j.degree_req || '本科'] = (degreeMap[j.degree_req || '本科'] || 0) + 1;
               politicMap[j.politic_req || '不限'] = (politicMap[j.politic_req || '不限'] || 0) + 1;
               deptMap[j.dept_name || '未知'] = (deptMap[j.dept_name || '未知'] || 0) + 1;
@@ -85,7 +85,7 @@ const MajorAnalysis: React.FC = () => {
               degreeStats: Object.entries(degreeMap).map(([name, value]) => ({ name, value })),
               politicStats: Object.entries(politicMap).map(([name, value]) => ({ name, value })),
               topDepts: Object.entries(deptMap).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value).slice(0, 5),
-              sampleJobs: data
+              sampleJobs: data as PublicServiceJobDB[]
           });
       } finally { setAnalyzing(false); }
   };
@@ -133,7 +133,8 @@ const MajorAnalysis: React.FC = () => {
                               <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fontWeight: 700, fill: '#94A3B8'}} />
                               <YAxis hide />
                               <Tooltip cursor={{fill: '#F8FAFC'}} contentStyle={{borderRadius: '24px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}} />
-                              <Bar dataKey="count" fill="#818CF8" radius={[15, 15, 15, 15]} barSize={40} onClick={(d) => analyzeMajor(d.name)} />
+                              {/* Fix: Use 'any' type for onClick data to avoid Recharts BarMouseEvent type mismatch with MajorTrend */}
+                              <Bar dataKey="count" fill="#818CF8" radius={[15, 15, 15, 15]} barSize={40} onClick={(d: any) => d && d.name && analyzeMajor(d.name)} />
                           </BarChart>
                       </ResponsiveContainer>
                    </div>
