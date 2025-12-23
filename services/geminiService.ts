@@ -1,12 +1,13 @@
+
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { Message, MessageRole, UserProfile, MatchResult, RecommendedJob, PublicServiceJobDB, ExamEvent, MockExamData, StudyPlanPhase } from "../types";
 import { SYSTEM_INSTRUCTION } from "../constants";
 import { supabase } from "./supabaseClient";
 
-// 允许通过环境变量配置 Base URL (用于反向代理/国内转发)
+// 修复构建报错 TS2353：baseUrl 不是 GoogleGenAI 的有效配置项，必须移除
+// 仅保留 apiKey
 const ai = new GoogleGenAI({ 
-  apiKey: process.env.API_KEY,
-  baseUrl: process.env.GATEWAY_URL || undefined
+  apiKey: process.env.API_KEY
 });
 
 const cleanJsonOutput = (text: string): string => {
@@ -23,7 +24,7 @@ const handleGeminiError = (error: any, context: string): string => {
     console.error(`Gemini API Error [${context}]:`, error);
 
     if (errorMsg.includes('403') || errorMsg.includes('Region not supported')) {
-        return "🌏 地域限制：Google Gemini 服务在当前地区不可用 (403)。\n💡 建议：\n1. 请开启 VPN 并切换至美国/新加坡节点。\n2. 或在 .env 配置 VITE_GATEWAY_URL 使用 API 转发服务。";
+        return "🌏 地域限制：Google Gemini 服务在当前地区不可用 (403)。\n💡 建议：\n1. 请开启 VPN 并切换至美国/新加坡节点。";
     }
 
     if (errorMsg.includes('429') || errorMsg.includes('quota') || errorMsg.includes('RESOURCE_EXHAUSTED')) {
