@@ -56,7 +56,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 <div className="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30">
                     <Sparkles className="w-7 h-7 text-white" />
                 </div>
-                <span className="text-2xl font-black text-white tracking-tight">公考智囊</span>
+                <span className="text-2xl font-black text-white tracking-tight">公考智辅</span>
             </div>
             <h1 className="text-4xl lg:text-5xl font-bold text-white leading-tight mb-6">
                 开启您的<br/><span className="text-primary">智慧公考</span>之旅

@@ -40,7 +40,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, user, onNavigate, onOpen
           <div className="w-10 h-10 bg-gradient-to-tr from-primary to-indigo-400 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-100">
             <ShieldCheck className="w-6 h-6 text-white" />
           </div>
-          <span className="text-xl font-bold text-slate-800 tracking-tight">公考智囊</span>
+          <span className="text-xl font-bold text-slate-800 tracking-tight">公考智辅</span>
         </div>
 
         {/* User Quick View */}

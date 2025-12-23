@@ -193,7 +193,7 @@ const Community: React.FC = () => {
                                 <Info className="w-4 h-4" /> 共享提示
                              </div>
                              <p className="text-sm text-blue-600 leading-relaxed">
-                                本资料由考生自发上传至公考智囊社区，版权归原作者所有。下载后请仅用于个人学习备考。
+                                本资料由考生自发上传至公考智辅社区，版权归原作者所有。下载后请仅用于个人学习备考。
                              </p>
                         </section>
                     </div>

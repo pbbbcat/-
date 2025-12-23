@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { CalendarDays, Clock, MapPin, CheckCircle2, Circle, Timer, Calendar, BarChart3, TrendingUp, AlertCircle, ArrowRight, Flag, Target, Zap, BookOpen, ChevronRight, X, Loader2, PlayCircle } from 'lucide-react';
+import { CalendarDays, Clock, MapPin, CheckCircle2, Circle, Timer, Calendar, BarChart3, TrendingUp, AlertCircle, ArrowRight, Flag, Target, Zap, BookOpen, ChevronRight, X, Loader2, PlayCircle, Rocket, BrainCircuit } from 'lucide-react';
 import { ExamEvent, StudyPlanPhase } from '../types';
 import { fetchExamCalendar } from '../services/resourceService';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from 'recharts';
@@ -11,8 +11,8 @@ const ExamCalendar: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [filterType, setFilterType] = useState<'all' | 'national' | 'provincial' | 'institution'>('all');
     
-    // Set baseline date to User's specific "now" for accurate countdowns
-    const [today, setToday] = useState(new Date('2025-12-18T10:00:00'));
+    // Updated: Use real-time system date instead of hardcoded date
+    const [today, setToday] = useState(new Date());
 
     // --- SPRINT PLANNER STATE ---
     const [isPlannerOpen, setIsPlannerOpen] = useState(false);
@@ -21,11 +21,14 @@ const ExamCalendar: React.FC = () => {
         targetExam: '2026年多省公务员联考',
         targetDate: '2026-03-21',
         dailyHours: 4,
-        weakness: '数量关系'
+        weakness: '数量关系与资料分析'
     });
     const [studyPlan, setStudyPlan] = useState<StudyPlanPhase[]>([]);
 
     useEffect(() => {
+        // Optional: Update timer every minute to keep date fresh if page stays open long
+        const timer = setInterval(() => setToday(new Date()), 60000);
+
         const load = async () => {
             setLoading(true);
             try {
@@ -44,10 +47,16 @@ const ExamCalendar: React.FC = () => {
             }
         };
         load();
+        return () => clearInterval(timer);
     }, []);
 
     const handleGeneratePlan = async () => {
         setPlanStep('generating');
+        const nextBigExamDate = new Date(planConfig.targetDate);
+        const diffTime = nextBigExamDate.getTime() - today.getTime();
+        const daysUntil = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        const displayDays = daysUntil > 0 ? daysUntil : 30; // Default to 30 if date passed or invalid
+
         const plan = await generateStudyPlan(
             planConfig.targetExam,
             displayDays,
@@ -58,10 +67,16 @@ const ExamCalendar: React.FC = () => {
         setPlanStep('result');
     };
 
+    const handleClosePlanner = () => {
+        setIsPlannerOpen(false);
+        setPlanStep('config'); // Reset to config for next time
+    };
+
     const nextBigExamDate = new Date(planConfig.targetDate + 'T00:00:00');
+    // Safe calculation for display in header
     const diffTime = nextBigExamDate.getTime() - today.getTime();
-    const daysUntil = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    const displayDays = daysUntil > 0 ? daysUntil : 0;
+    const daysUntilHeader = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const displayDaysHeader = daysUntilHeader > 0 ? daysUntilHeader : 0;
 
     const filteredEvents = events.filter(e => filterType === 'all' || e.type === filterType);
 
@@ -85,6 +100,123 @@ const ExamCalendar: React.FC = () => {
         }
     };
 
+    // Helper to render the Sprint Planner Modal
+    const renderPlannerModal = () => {
+        if (!isPlannerOpen) return null;
+
+        return (
+            <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+                <div className="bg-white rounded-[2.5rem] w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                    <div className="px-8 py-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
+                        <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                            <Zap className="w-5 h-5 text-amber-500" />
+                            智能备考冲刺规划
+                        </h3>
+                        <button onClick={handleClosePlanner} className="p-2 hover:bg-slate-100 rounded-full text-slate-400">
+                            <X className="w-6 h-6" />
+                        </button>
+                    </div>
+
+                    <div className="p-8 overflow-y-auto custom-scrollbar flex-1">
+                        {planStep === 'config' && (
+                            <div className="space-y-6 animate-fade-in">
+                                <div>
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 block">目标考试</label>
+                                    <input 
+                                        type="text" 
+                                        value={planConfig.targetExam}
+                                        onChange={e => setPlanConfig({...planConfig, targetExam: e.target.value})}
+                                        className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-slate-700 focus:ring-2 focus:ring-primary/20 outline-none"
+                                    />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 block">目标日期</label>
+                                        <input 
+                                            type="date" 
+                                            value={planConfig.targetDate}
+                                            onChange={e => setPlanConfig({...planConfig, targetDate: e.target.value})}
+                                            className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-slate-700 focus:ring-2 focus:ring-primary/20 outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 block">日均投入 (小时)</label>
+                                        <input 
+                                            type="number" 
+                                            value={planConfig.dailyHours}
+                                            onChange={e => setPlanConfig({...planConfig, dailyHours: parseInt(e.target.value)})}
+                                            className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-slate-700 focus:ring-2 focus:ring-primary/20 outline-none"
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 block">薄弱模块 (AI 将重点强化)</label>
+                                    <input 
+                                        type="text" 
+                                        value={planConfig.weakness}
+                                        onChange={e => setPlanConfig({...planConfig, weakness: e.target.value})}
+                                        className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-slate-700 focus:ring-2 focus:ring-primary/20 outline-none"
+                                        placeholder="例如：数量关系、申论大作文..."
+                                    />
+                                </div>
+                                <button 
+                                    onClick={handleGeneratePlan}
+                                    className="w-full py-4 bg-primary text-white font-bold rounded-2xl shadow-xl shadow-indigo-100 hover:bg-indigo-600 transition-all flex items-center justify-center gap-2 mt-4"
+                                >
+                                    <BrainCircuit className="w-5 h-5" /> 生成 AI 冲刺方案
+                                </button>
+                            </div>
+                        )}
+
+                        {planStep === 'generating' && (
+                            <div className="flex flex-col items-center justify-center py-20 space-y-6">
+                                <div className="w-20 h-20 border-[6px] border-slate-100 border-t-primary rounded-full animate-spin"></div>
+                                <div className="text-center">
+                                    <h4 className="text-xl font-bold text-slate-800">AI 正在规划路径...</h4>
+                                    <p className="text-slate-400 mt-2">分析剩余天数与薄弱项，拆解学习任务</p>
+                                </div>
+                            </div>
+                        )}
+
+                        {planStep === 'result' && (
+                            <div className="space-y-8 animate-fade-in">
+                                <div className="bg-emerald-50 p-6 rounded-3xl border border-emerald-100 text-center">
+                                    <p className="text-emerald-800 font-bold text-lg">🚀 您的专属上岸计划已生成</p>
+                                    <p className="text-emerald-600/80 text-sm mt-1">请严格执行，祝您一举成“公”！</p>
+                                </div>
+                                <div className="relative pl-4 space-y-8 before:absolute before:left-0 before:top-2 before:bottom-2 before:w-[2px] before:bg-slate-200">
+                                    {studyPlan.map((phase, idx) => (
+                                        <div key={idx} className="relative pl-8">
+                                            <div className="absolute left-[-5px] top-0 w-3 h-3 bg-white border-2 border-primary rounded-full"></div>
+                                            <h4 className="font-bold text-lg text-slate-800">{phase.phaseName} <span className="text-sm font-normal text-slate-500 ml-2">({phase.duration})</span></h4>
+                                            <p className="text-primary font-bold text-sm mt-1 mb-3 flex items-center gap-2">
+                                                <Target className="w-4 h-4" /> 核心目标：{phase.focus}
+                                            </p>
+                                            <ul className="space-y-2">
+                                                {phase.tasks.map((task, tIdx) => (
+                                                    <li key={tIdx} className="flex items-start gap-3 bg-slate-50 p-3 rounded-xl border border-slate-100 text-sm text-slate-600">
+                                                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                                                        {task}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    ))}
+                                </div>
+                                <button 
+                                    onClick={handleClosePlanner}
+                                    className="w-full py-4 bg-slate-100 text-slate-600 font-bold rounded-2xl hover:bg-slate-200 transition-all"
+                                >
+                                    保存并关闭
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
     return (
         <div className="p-8 max-w-7xl mx-auto animate-fade-in pb-20">
             <header className="mb-10 grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -99,9 +231,9 @@ const ExamCalendar: React.FC = () => {
                          <Clock className="w-4 h-4 text-primary" />
                          <span className="font-medium">当前基准：</span>
                          <span className="font-bold text-slate-800 bg-slate-100 px-3 py-1 rounded-xl">
-                            2025年12月18日
+                            {today.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
                          </span>
-                         <span className="text-xs text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full font-bold">2026省考倒计时开启</span>
+                         <span className="text-xs text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full font-bold">时间同步中</span>
                     </div>
                     
                     <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm relative overflow-hidden">
@@ -126,11 +258,11 @@ const ExamCalendar: React.FC = () => {
                             2026年多省联考
                         </h3>
                         <div className="flex items-baseline gap-1 mt-2">
-                            <span className="text-5xl font-bold tracking-tight">{displayDays}</span>
+                            <span className="text-5xl font-bold tracking-tight">{displayDaysHeader}</span>
                             <span className="text-lg opacity-80 font-bold ml-1">天</span>
                         </div>
                         <p className="text-xs text-indigo-200 mt-3 opacity-80 font-medium">
-                            预计笔试：2026年3月21日
+                            预计笔试：{planConfig.targetDate}
                         </p>
                         <button 
                             onClick={() => setIsPlannerOpen(true)}
@@ -204,6 +336,9 @@ const ExamCalendar: React.FC = () => {
                     </div>
                 )}
             </div>
+
+            {/* Render the Sprint Planner Modal */}
+            {renderPlannerModal()}
         </div>
     );
 };

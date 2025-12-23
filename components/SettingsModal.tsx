@@ -165,7 +165,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ user, onClose, onLogout }
           </div>
 
           <div className="p-6 bg-slate-50 border-t border-gray-100 text-center">
-             <p className="text-[10px] text-slate-400 font-medium">公考智囊 v2.2.0 · 专业助您一臂之力</p>
+             <p className="text-[10px] text-slate-400 font-medium">公考智辅 v2.2.0 · 专业助您一臂之力</p>
           </div>
         </div>
       </div>
