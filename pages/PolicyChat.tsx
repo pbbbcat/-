@@ -41,20 +41,32 @@ const PolicyChat: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // The sendMessageToGemini function now handles the RAG lookup internally
+      // The sendMessageToGemini function now handles context history
       const responseText = await sendMessageToGemini(messages, input);
       
+      // Dynamic extraction of citations in format 《...》 to generate visual chips
+      // The text itself will contain the full citations via Markdown as enforced by System Instructions
+      const citationRegex = /《([^》]+)》/g;
+      const foundCitations = responseText.match(citationRegex);
+      const uniqueCitations = foundCitations ? Array.from(new Set(foundCitations)) : [];
+
       const botMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: MessageRole.MODEL,
         content: responseText,
         timestamp: new Date(),
-        // Mock citations fallback, real logic would parse response or returns
-        citations: input.includes("应届") ? ["《公务员录用规定》第十八条", "《2026年国考报考指南》"] : undefined
+        citations: uniqueCitations.length > 0 ? uniqueCitations : undefined
       };
       setMessages(prev => [...prev, botMsg]);
     } catch (error) {
       console.error(error);
+      const errorMsg: Message = {
+          id: Date.now().toString(),
+          role: MessageRole.MODEL,
+          content: "抱歉，系统暂时繁忙，请稍后再试。",
+          timestamp: new Date()
+      };
+      setMessages(prev => [...prev, errorMsg]);
     } finally {
       setIsLoading(false);
     }
@@ -80,7 +92,7 @@ const PolicyChat: React.FC = () => {
         </div>
         <div className="bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            已连接知识库
+            已连接法规库
         </div>
       </div>
 
@@ -88,7 +100,7 @@ const PolicyChat: React.FC = () => {
       <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50">
         {messages.map((msg) => (
           <div key={msg.id} className={`flex w-full ${msg.role === MessageRole.USER ? 'justify-end' : 'justify-start'}`}>
-            <div className={`flex max-w-[80%] gap-4 ${msg.role === MessageRole.USER ? 'flex-row-reverse' : 'flex-row'}`}>
+            <div className={`flex max-w-[85%] gap-4 ${msg.role === MessageRole.USER ? 'flex-row-reverse' : 'flex-row'}`}>
               
               {/* Avatar */}
               <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 shadow-sm ${
@@ -98,25 +110,24 @@ const PolicyChat: React.FC = () => {
               </div>
 
               {/* Bubble */}
-              <div className="flex flex-col gap-2">
-                <div className={`p-4 rounded-2xl shadow-sm ${
+              <div className="flex flex-col gap-2 min-w-0">
+                <div className={`p-5 rounded-2xl shadow-sm ${
                     msg.role === MessageRole.USER 
                     ? 'bg-primary text-white rounded-tr-none' 
                     : 'bg-white text-slate-700 rounded-tl-none border border-gray-100'
                 }`}>
-                    <div className="prose prose-sm max-w-none prose-p:my-1 prose-pre:bg-slate-800 prose-pre:text-white">
+                    <div className="prose prose-sm max-w-none prose-p:my-1 prose-pre:bg-slate-800 prose-pre:text-white prose-blockquote:border-l-4 prose-blockquote:border-emerald-500 prose-blockquote:bg-emerald-50 prose-blockquote:py-2 prose-blockquote:px-4 prose-blockquote:rounded-r-lg prose-blockquote:not-italic prose-blockquote:text-slate-600">
                          <ReactMarkdown>{msg.content}</ReactMarkdown>
                     </div>
                 </div>
 
-                {/* Citations (Only for Model) */}
+                {/* Citations (Only for Model) - Visual Chips extracted from text */}
                 {msg.role === MessageRole.MODEL && msg.citations && (
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2 animate-fade-in">
                         {msg.citations.map((cite, i) => (
-                            <div key={i} className="flex items-center gap-1 bg-white px-2 py-1 rounded border border-blue-100 text-[10px] text-blue-600 cursor-pointer hover:bg-blue-50 transition-colors">
+                            <div key={i} className="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-indigo-100 text-[10px] text-indigo-600 cursor-default shadow-sm">
                                 <BookOpen className="w-3 h-3" />
                                 <span>{cite}</span>
-                                <ExternalLink className="w-2.5 h-2.5 ml-0.5" />
                             </div>
                         ))}
                     </div>
@@ -138,7 +149,7 @@ const PolicyChat: React.FC = () => {
                     <div className="bg-white p-4 rounded-2xl rounded-tl-none border border-gray-100 shadow-sm flex items-center">
                         <div className="flex items-center space-x-2 text-xs text-slate-500">
                              <Database className="w-3 h-3 text-emerald-500 animate-pulse" />
-                             <span className="animate-pulse">正在检索 Supabase 知识库...</span>
+                             <span className="animate-pulse">正在检索 RAG 法规库并验证条款...</span>
                         </div>
                     </div>
                 </div>
@@ -154,7 +165,7 @@ const PolicyChat: React.FC = () => {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyPress}
-            placeholder="请输入您的问题，例如：招录计算机专业的岗位有哪些？"
+            placeholder="请输入您的问题，例如：往届生是否有基层经历限制？"
             className="w-full bg-slate-50 border border-gray-200 rounded-2xl pl-4 pr-14 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary resize-none h-14"
             disabled={isLoading}
           />
@@ -167,7 +178,7 @@ const PolicyChat: React.FC = () => {
           </button>
         </div>
         <p className="text-center text-[10px] text-slate-300 mt-2">
-            内容由 AI 生成，仅供参考。重要决策请查阅官方公告或咨询招录单位。
+            AI 自动标注法规出处，仅供参考。重要决策请查阅官方公告原文。
         </p>
       </div>
     </div>

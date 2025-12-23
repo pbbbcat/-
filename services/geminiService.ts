@@ -1,10 +1,13 @@
-
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { Message, MessageRole, UserProfile, MatchResult, RecommendedJob, PublicServiceJobDB, ExamEvent, MockExamData, StudyPlanPhase } from "../types";
 import { SYSTEM_INSTRUCTION } from "../constants";
 import { supabase } from "./supabaseClient";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// 允许通过环境变量配置 Base URL (用于反向代理/国内转发)
+const ai = new GoogleGenAI({ 
+  apiKey: process.env.API_KEY,
+  baseUrl: process.env.GATEWAY_URL || undefined
+});
 
 const cleanJsonOutput = (text: string): string => {
   if (!text) return "{}";
@@ -19,6 +22,10 @@ const handleGeminiError = (error: any, context: string): string => {
     const errorMsg = error.message || JSON.stringify(error);
     console.error(`Gemini API Error [${context}]:`, error);
 
+    if (errorMsg.includes('403') || errorMsg.includes('Region not supported')) {
+        return "🌏 地域限制：Google Gemini 服务在当前地区不可用 (403)。\n💡 建议：\n1. 请开启 VPN 并切换至美国/新加坡节点。\n2. 或在 .env 配置 VITE_GATEWAY_URL 使用 API 转发服务。";
+    }
+
     if (errorMsg.includes('429') || errorMsg.includes('quota') || errorMsg.includes('RESOURCE_EXHAUSTED')) {
         return "⚠️ 服务繁忙：API 调用次数超限（429）。\n原因：当前使用的 API Key 触发了 Google 的频率限制。\n建议：请等待 1-2 分钟后再试，避免频繁点击生成。";
     }
@@ -30,7 +37,7 @@ const handleGeminiError = (error: any, context: string): string => {
  * 优化点：不再完全依赖简单的 SQL 模糊查询，而是获取后在前端/Service层进行严格的逻辑匹配（学历层级、性别限制、政治面貌）。
  */
 export const searchSimilarJobs = async (userProfile: UserProfile): Promise<PublicServiceJobDB[]> => {
-  const { major, degree, politicalStatus, gender, isFreshGrad, hasGrassrootsExperience } = userProfile;
+  const { major, degree, politicalStatus, gender, isFreshGrad, hasGrassrootsExperience, experienceYears, certificates } = userProfile;
   const majorTerm = major.replace(/专业|类|大类/g, '').trim();
   
   if (!majorTerm) return [];
@@ -60,7 +67,7 @@ export const searchSimilarJobs = async (userProfile: UserProfile): Promise<Publi
       const jobMajor = (job.major_req || '').toLowerCase();
       const jobDegree = (job.degree_req || '').toLowerCase();
       const jobPolitic = (job.politic_req || '').toLowerCase();
-
+      
       // --- FILTER 1: GENDER ---
       // If user is Male, reject "Female Only". If Female, reject "Male Only".
       if (gender === '男') {
@@ -97,7 +104,28 @@ export const searchSimilarJobs = async (userProfile: UserProfile): Promise<Publi
       if (userDegreeLevel < jobDegreeLevel) return false;
 
       // --- FILTER 5: GRASSROOTS EXPERIENCE ---
-      if (remarks.includes('基层工作经历') && !hasGrassrootsExperience) return false;
+      // Strict Check: If remarks say "2年基层", user must have >= 2 years.
+      const reqExpMatch = remarks.match(/(\d+)年.*基层/);
+      if (reqExpMatch) {
+          const yearsRequired = parseInt(reqExpMatch[1]);
+          const userExp = hasGrassrootsExperience ? (experienceYears || 0) : 0;
+          if (userExp < yearsRequired) return false;
+      } else if ((remarks.includes('基层工作') || remarks.includes('基层经历')) && !hasGrassrootsExperience) {
+           // General requirement without specific years often implies at least some experience (usually 2 years in policy, but strictly checking bool here)
+           // But sometimes it says "无基层工作经历限制".
+           if (!remarks.includes('无限制') && !remarks.includes('不限')) {
+               // To be safe, if we don't have exp and it mentions it, we flag it. 
+               // However, text matching is tricky. Let's assume if it says "具有...基层工作经历" it's a requirement.
+               if (remarks.includes('具有') && remarks.includes('基层')) return false;
+           }
+      }
+
+      // --- FILTER 6: PREDEFINED CERTIFICATES ---
+      const userCerts = certificates || [];
+      if ((remarks.includes('四级') || remarks.includes('cet-4') || remarks.includes('cet4')) && !userCerts.some(c => c.includes('四级') || c.includes('六级'))) return false;
+      if ((remarks.includes('六级') || remarks.includes('cet-6') || remarks.includes('cet6')) && !userCerts.some(c => c.includes('六级'))) return false;
+      if (remarks.includes('计算机二级') && !userCerts.some(c => c.includes('计算机二级'))) return false;
+      if ((remarks.includes('法律职业') || remarks.includes('司考') || remarks.includes('a证')) && !userCerts.some(c => c.includes('法律职业'))) return false;
 
       return true;
   }).map(job => {
@@ -114,6 +142,19 @@ export const searchSimilarJobs = async (userProfile: UserProfile): Promise<Publi
 
       // Political Bonus
       if (politicalStatus.includes('党员') && (job.politic_req || '').includes('党员')) score += 5;
+      
+      // Certificate Bonus (Dynamic check for ANY user certificate in remarks)
+      if (certificates && certificates.length > 0) {
+          // Check if any held certificate string (e.g. "教师资格", "驾驶证") is present in remarks
+          // This allows custom certificates to boost score even if not hardcoded in filter
+          const hasRelevantCert = certificates.some(cert => {
+              const cleanCert = cert.replace('证', ''); // simple normalization
+              return remarks.includes(cleanCert);
+          });
+          
+          if (hasRelevantCert) score += 8;
+          else if (remarks.includes('证书') || remarks.includes('资格')) score += 2; // Small bonus if job mentions certs generally
+      }
 
       return { ...job, similarity: Math.min(score, 99) / 100 };
   });
@@ -122,21 +163,74 @@ export const searchSimilarJobs = async (userProfile: UserProfile): Promise<Publi
   return processedJobs.sort((a, b) => (b.similarity || 0) - (a.similarity || 0));
 };
 
+/**
+ * 深度匹配分析：文本模式
+ * 升级为使用 responseSchema，确保百分百 JSON 格式输出
+ */
 export const analyzeJobMatch = async (
   jobText: string,
   userProfile: UserProfile,
   dbCandidates: any[] = [] 
 ): Promise<MatchResult> => {
-  if (!process.env.API_KEY) return { score: 0, eligible: false, hardConstraints: [], softConstraints: [], analysis: "API Key 配置缺失，无法分析。", otherRecommendedJobs: [] };
+  if (!process.env.API_KEY) return { score: 0, eligible: false, hardConstraints: [], softConstraints: [], analysis: "API Key 配置缺失。", otherRecommendedJobs: [] };
 
-  const prompt = `分析画像 ${JSON.stringify(userProfile)} 与文本 """${jobText}""" 的匹配度。返回 JSON。`;
+  const prompt = `
+    Candidate Profile: ${JSON.stringify(userProfile)}
+    Job Announcement: """${jobText}"""
+    
+    Analyze compatibility. Check Hard Constraints (Degree, Major, Political, Gender, Grad Year) and Soft Constraints (Skills, Experience).
+    Provide a match score (0-100) and detailed analysis.
+  `;
+
+  const matchSchema: Schema = {
+    type: Type.OBJECT,
+    properties: {
+      score: { type: Type.INTEGER },
+      eligible: { type: Type.BOOLEAN },
+      analysis: { type: Type.STRING },
+      hardConstraints: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            name: { type: Type.STRING },
+            passed: { type: Type.BOOLEAN },
+            details: { type: Type.STRING }
+          },
+          required: ["name", "passed", "details"]
+        }
+      },
+      softConstraints: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            name: { type: Type.STRING },
+            passed: { type: Type.BOOLEAN },
+            details: { type: Type.STRING }
+          },
+          required: ["name", "passed", "details"]
+        }
+      }
+    },
+    required: ["score", "eligible", "analysis", "hardConstraints", "softConstraints"]
+  };
+
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview', 
       contents: prompt,
-      config: { responseMimeType: "application/json" }
+      config: { 
+        responseMimeType: "application/json",
+        responseSchema: matchSchema
+      }
     });
-    return JSON.parse(cleanJsonOutput(response.text || ""));
+    
+    const text = response.text;
+    if (!text) throw new Error("Empty response");
+    
+    const result = JSON.parse(cleanJsonOutput(text));
+    return { ...result, otherRecommendedJobs: [] };
   } catch (error: any) {
     const friendlyMsg = handleGeminiError(error, "Analyze Match");
     return { 
@@ -150,17 +244,109 @@ export const analyzeJobMatch = async (
   }
 };
 
+/**
+ * 新增功能：图片 OCR 结构化提取
+ * 目的：让用户确认识别内容，而不是直接匹配，提高容错率
+ */
+export const extractJobFromImage = async (base64Data: string, mimeType: string): Promise<Partial<PublicServiceJobDB>> => {
+    if (!process.env.API_KEY) throw new Error("API Key Missing");
+
+    const prompt = `
+      Task: OCR and Structure Extraction.
+      Extract job details from the image. Use empty string if missing.
+    `;
+    
+    // Schema specifically for OCR extraction
+    const ocrSchema: Schema = {
+        type: Type.OBJECT,
+        properties: {
+            job_name: { type: Type.STRING },
+            dept_name: { type: Type.STRING },
+            major_req: { type: Type.STRING },
+            degree_req: { type: Type.STRING },
+            politic_req: { type: Type.STRING },
+            remarks: { type: Type.STRING },
+            recruit_count: { type: Type.NUMBER }
+        },
+        required: ["job_name", "dept_name", "major_req"]
+    };
+
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: {
+                parts: [
+                    { inlineData: { mimeType, data: base64Data } },
+                    { text: prompt }
+                ]
+            },
+            config: { 
+                responseMimeType: "application/json",
+                responseSchema: ocrSchema
+            }
+        });
+        
+        return JSON.parse(cleanJsonOutput(response.text || "{}"));
+    } catch (error) {
+        console.error("OCR Extraction Failed", error);
+        throw error;
+    }
+};
+
+/**
+ * 深度匹配分析：图片 OCR 模式 (Legacy / Shortcut)
+ * 仅保留用于向后兼容，建议使用 extractJobFromImage -> analyzeJobMatch 流程
+ */
+export const analyzeImageJobMatch = async (
+    base64Data: string, 
+    mimeType: string, 
+    userProfile: UserProfile
+): Promise<MatchResult> => {
+    // Re-use extraction + text analysis logic to ensure consistency
+    try {
+        const extracted = await extractJobFromImage(base64Data, mimeType);
+        const textRepresentation = `
+            职位: ${extracted.job_name}
+            部门: ${extracted.dept_name}
+            专业: ${extracted.major_req}
+            学历: ${extracted.degree_req}
+            政治面貌: ${extracted.politic_req}
+            备注/其他要求: ${extracted.remarks}
+        `;
+        return await analyzeJobMatch(textRepresentation, userProfile);
+    } catch (error: any) {
+        const friendlyMsg = handleGeminiError(error, "Image Analysis");
+        return { 
+            score: 0, 
+            eligible: false, 
+            hardConstraints: [], 
+            softConstraints: [], 
+            analysis: friendlyMsg, 
+            otherRecommendedJobs: [] 
+        };
+    }
+};
+
 export const sendMessageToGemini = async (history: Message[], userMessage: string): Promise<string> => {
     if (!process.env.API_KEY) return "系统错误：未配置 API Key。请联系管理员在 Vercel 后台添加 VITE_API_KEY。";
 
     try {
+        // 1. 将前端消息历史映射为 Gemini API 所需的 Context 格式
+        // 这里实现了“上下文管理”的核心：保持多轮对话的连贯性
+        const historyContent = history.map(msg => ({
+            role: msg.role === MessageRole.USER ? 'user' : 'model',
+            parts: [{ text: msg.content }]
+        }));
+
+        // 2. 创建带记忆和 System Instruction 的 Chat 会话
+        // systemInstruction 确保了 AI 的“人设”和“回答规范”
         const chat = ai.chats.create({ 
             model: 'gemini-3-flash-preview', 
-            config: { systemInstruction: SYSTEM_INSTRUCTION } 
+            config: { systemInstruction: SYSTEM_INSTRUCTION },
+            history: historyContent 
         });
         
-        // 构造历史消息上下文 (Gemini API 格式)
-        // 实际应用中应正确转换 history 格式，这里简化处理直接发送新消息
+        // 3. 发送新消息并等待流式/非流式响应
         const result = await chat.sendMessage({ message: userMessage });
         return result.text || "";
     } catch (error: any) {

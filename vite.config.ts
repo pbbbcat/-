@@ -10,6 +10,7 @@ export default defineConfig(({ mode }) => {
     define: {
       // 关键修改：优先读取 VITE_API_KEY，其次是 API_KEY
       'process.env.API_KEY': JSON.stringify(env.VITE_API_KEY || env.API_KEY || ""),
+      'process.env.GATEWAY_URL': JSON.stringify(env.VITE_GATEWAY_URL || env.GATEWAY_URL || ""),
       'process.env.SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL || env.SUPABASE_URL || ""),
       'process.env.SUPABASE_KEY': JSON.stringify(env.VITE_SUPABASE_SERVICE_KEY || env.SUPABASE_SERVICE_KEY || env.SUPABASE_KEY || ""),
       'process.env.NODE_ENV': JSON.stringify(mode),
