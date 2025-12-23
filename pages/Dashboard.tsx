@@ -20,7 +20,12 @@ import {
   ClipboardList, 
   Sparkles, 
   Search, 
-  ShieldCheck 
+  ShieldCheck,
+  FileText,
+  Landmark,
+  Scale,
+  Award,
+  BookOpen
 } from 'lucide-react';
 import { Page, UserProfile, PublicServiceJobDB } from '../types';
 import { supabase } from '../services/supabaseClient';
@@ -80,61 +85,130 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate, userProfile }) => {
 
   const renderJobModal = () => {
     if (!selectedJob) return null;
+    const job = selectedJob;
+
+    const DetailItem = ({ label, value, full = false }: { label: string, value?: string | number, full?: boolean }) => (
+        <div className={`p-4 bg-slate-50 rounded-2xl border border-slate-100 ${full ? 'col-span-2 md:col-span-3' : ''}`}>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{label}</p>
+            <p className="text-sm font-bold text-slate-700 break-words">{value || '无'}</p>
+        </div>
+    );
+
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-md animate-fade-in">
-        <div className="bg-white rounded-[2.5rem] w-full max-w-2xl shadow-2xl border border-white/20 overflow-hidden max-h-[90vh] flex flex-col animate-soft">
-             <div className="px-8 py-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/30">
-                <div>
-                     <h3 className="text-2xl font-bold text-slate-800">{selectedJob.job_name}</h3>
-                     <p className="text-primary font-bold flex items-center gap-2 mt-1">{selectedJob.dept_name}</p>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in">
+        <div className="bg-white rounded-[2.5rem] w-full max-w-4xl shadow-2xl border border-white/20 overflow-hidden max-h-[92vh] flex flex-col animate-soft">
+             {/* Header */}
+             <div className="px-8 py-6 border-b border-slate-50 flex justify-between items-start bg-slate-50/50">
+                <div className="flex-1 mr-4">
+                     <div className="flex flex-wrap gap-2 mb-2">
+                        <span className="bg-primary/10 text-primary text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-tighter">职位代码: {job.job_code}</span>
+                        <span className="bg-slate-100 text-slate-500 text-[10px] font-black px-2 py-0.5 rounded-md">部门代码: {job.dept_code || '-'}</span>
+                     </div>
+                     <h3 className="text-2xl font-bold text-slate-800 leading-tight">{job.job_name}</h3>
+                     <p className="text-slate-500 font-bold flex items-center gap-2 mt-2 text-sm">
+                        <Building2 className="w-4 h-4" /> 
+                        {job.dept_name} 
+                        <span className="text-slate-300">|</span> 
+                        <span className="text-primary">{job.sub_dept}</span>
+                     </p>
                 </div>
-                <button onClick={() => setSelectedJob(null)} className="p-3 bg-white hover:bg-slate-100 text-slate-400 rounded-full transition-all shadow-sm border border-slate-100">
+                <button onClick={() => setSelectedJob(null)} className="p-3 bg-white hover:bg-slate-100 text-slate-400 rounded-full transition-all shadow-sm border border-slate-100 shrink-0">
                     <X className="w-5 h-5" />
                 </button>
              </div>
 
-             <div className="p-8 overflow-y-auto custom-scrollbar space-y-8">
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-                    <div className="bg-slate-50/50 p-4 rounded-3xl border border-slate-100">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">招考人数</p>
-                        <p className="text-xl font-bold text-slate-800">{selectedJob.recruit_count || 1} 人</p>
-                    </div>
-                    <div className="bg-slate-50/50 p-4 rounded-3xl border border-slate-100">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">学历要求</p>
-                        <p className="text-xl font-bold text-slate-800">{selectedJob.degree_req || '本科'}</p>
-                    </div>
-                    <div className="bg-slate-50/50 p-4 rounded-3xl border border-slate-100">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">政治面貌</p>
-                        <p className="text-xl font-bold text-slate-800">{selectedJob.politic_req || '不限'}</p>
-                    </div>
-                </div>
-
-                <div>
-                    <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
-                        <div className="w-1.5 h-4 bg-primary rounded-full"></div> 专业详细要求
+             <div className="flex-1 overflow-y-auto custom-scrollbar p-8 space-y-8">
+                {/* 1. 职位属性概览 */}
+                <section>
+                    <h4 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
+                        <Landmark className="w-4 h-4 text-primary" /> 机构与职位属性
                     </h4>
-                    <p className="text-slate-600 bg-slate-50 p-5 rounded-3xl leading-relaxed text-sm border border-slate-100">
-                        {selectedJob.major_req}
-                    </p>
-                </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <DetailItem label="机构性质" value={job.org_nature} />
+                        <DetailItem label="机构层级" value={job.org_level} />
+                        <DetailItem label="职位属性" value={job.job_attr} />
+                        <DetailItem label="考试类别" value={job.exam_cat} />
+                        <DetailItem label="职位分布" value={job.job_dist} full />
+                        <DetailItem label="职位简介" value={job.job_desc} full />
+                    </div>
+                </section>
 
-                <div className="bg-red-50/50 p-6 rounded-3xl border border-red-100">
-                    <h4 className="text-danger font-bold text-sm mb-2 flex items-center gap-2">
-                        <AlertTriangle className="w-4 h-4" /> 重要报考提示
+                {/* 2. 报考硬性门槛 (Highlighted) */}
+                <section className="bg-indigo-50/50 p-6 rounded-3xl border border-indigo-100">
+                    <h4 className="text-sm font-bold text-indigo-900 mb-4 flex items-center gap-2">
+                        <GraduationCap className="w-4 h-4 text-indigo-600" /> 报考硬性门槛
                     </h4>
-                    <p className="text-danger/80 text-sm leading-relaxed">{selectedJob.remarks || '无特殊限制建议报考。'}</p>
-                </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="p-4 bg-white rounded-2xl border border-indigo-50 md:col-span-3">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">专业要求</p>
+                            <p className="text-base font-black text-indigo-600 leading-relaxed">{job.major_req}</p>
+                        </div>
+                        <div className="p-4 bg-white rounded-2xl border border-indigo-50">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">学历要求</p>
+                            <p className="text-sm font-bold text-slate-700">{job.degree_req}</p>
+                        </div>
+                        <div className="p-4 bg-white rounded-2xl border border-indigo-50">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">学位要求</p>
+                            <p className="text-sm font-bold text-slate-700">{job.degree_type}</p>
+                        </div>
+                        <div className="p-4 bg-white rounded-2xl border border-indigo-50">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">政治面貌</p>
+                            <p className="text-sm font-bold text-slate-700">{job.politic_req}</p>
+                        </div>
+                        <div className="p-4 bg-white rounded-2xl border border-indigo-50 md:col-span-3">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">基层工作经历 / 服务项目</p>
+                            <div className="flex gap-4 text-sm font-bold text-slate-700">
+                                <span>最低年限：{job.exp_years || '无限制'}</span>
+                                <span className="text-slate-300">|</span>
+                                <span>服务项目：{job.service_proj || '无限制'}</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                {/* 3. 考试与录用信息 */}
+                <section>
+                    <h4 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
+                        <Scale className="w-4 h-4 text-emerald-600" /> 考试与录用情报
+                    </h4>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
+                            <p className="text-[10px] font-bold text-emerald-600/60 uppercase tracking-widest mb-1">招考人数</p>
+                            <p className="text-xl font-black text-emerald-600">{job.recruit_count} 人</p>
+                        </div>
+                        <DetailItem label="面试人员比例" value={job.interview_ratio} />
+                        <DetailItem label="专业能力测试" value={job.has_pro_test ? '是' : '否'} />
+                        <DetailItem label="工作地点" value={job.work_loc} />
+                        <DetailItem label="落户地点" value={job.settle_loc} full />
+                    </div>
+                </section>
+
+                {/* 4. 备注与咨询 */}
+                <section>
+                    {job.remarks && (
+                        <div className="bg-red-50 p-5 rounded-2xl border border-red-100 mb-4">
+                            <h4 className="text-red-600 font-bold text-xs mb-2 flex items-center gap-2 uppercase tracking-widest">
+                                <AlertTriangle className="w-3.5 h-3.5" /> 重要备注
+                            </h4>
+                            <p className="text-sm text-red-500 leading-relaxed font-medium">{job.remarks}</p>
+                        </div>
+                    )}
+                    <div className="flex items-center gap-3 text-xs text-slate-400 font-bold bg-slate-50 p-4 rounded-2xl">
+                        <Phone className="w-4 h-4" /> 
+                        咨询电话：{Array.isArray(job.phones) ? job.phones.join('、') : (job.phones || '详见公告')}
+                    </div>
+                </section>
              </div>
 
              <div className="px-8 py-6 bg-slate-50/50 border-t border-slate-50 flex justify-end gap-3">
                 <button onClick={() => setSelectedJob(null)} className="px-6 py-3 text-slate-500 font-bold hover:bg-white rounded-2xl transition-all">
-                    稍后再看
+                    关闭
                 </button>
                 <button 
                     className="px-8 py-3 bg-primary text-white font-bold rounded-2xl shadow-xl shadow-indigo-100 hover:bg-indigo-600 transition-all active:scale-95 flex items-center gap-2"
-                    onClick={() => handleApplyUrl(selectedJob.website)}
+                    onClick={() => handleApplyUrl(job.website)}
                 >
-                    立即报名
+                    前往报名官网
                     <ExternalLink className="w-4 h-4" />
                 </button>
              </div>

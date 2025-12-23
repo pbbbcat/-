@@ -34,28 +34,42 @@ export interface UserProfile {
 
 export interface PublicServiceJobDB {
   id: number;
-  dept_code?: string;
-  dept_name: string;
-  sub_dept?: string;
-  org_nature?: string;
-  job_code: string;
-  job_name: string;
-  job_desc?: string;
-  job_attr?: string;
-  recruit_count?: number;
-  major_req: string;
-  degree_req: string;
-  degree_type?: string;
-  politic_req?: string;
-  exp_years?: string;
-  exp_proj?: string;
-  has_pro_test?: boolean;
-  interview_ratio?: string;
-  work_loc?: string;
-  settle_loc?: string;
-  remarks?: string;
-  website?: string;
-  phones?: string[];
+  // --- 部门信息 ---
+  dept_code?: string;       // 部门代码
+  dept_name: string;        // 部门名称
+  sub_dept?: string;        // 用人司局
+  org_nature?: string;      // 机构性质
+  org_level?: string;       // 机构层级 (new)
+  
+  // --- 职位基本信息 ---
+  job_code: string;         // 职位代码
+  job_name: string;         // 招考职位/职位名称
+  job_desc?: string;        // 职位简介
+  job_attr?: string;        // 职位属性
+  job_dist?: string;        // 职位分布 (new)
+  exam_cat?: string;        // 考试类别 (new)
+  recruit_count?: number;   // 招考人数
+
+  // --- 报考门槛 ---
+  major_req: string;        // 专业
+  degree_req: string;       // 学历
+  degree_type?: string;     // 学位
+  politic_req?: string;     // 政治面貌
+  exp_years?: string;       // 基层工作最低年限
+  service_proj?: string;    // 服务基层项目工作经历 (new)
+  
+  // --- 考试与录用 ---
+  has_pro_test?: boolean;   // 是否在面试阶段组织专业能力测试
+  interview_ratio?: string; // 面试人员比例
+  
+  // --- 其他 ---
+  work_loc?: string;        // 工作地点
+  settle_loc?: string;      // 落户地点
+  remarks?: string;         // 备注
+  website?: string;         // 官网
+  phones?: string[];        // 咨询电话
+  
+  // --- 前端计算字段 ---
   similarity?: number;
 }
 
